@@ -246,6 +246,41 @@ export const deleteTour = async (req: Request, res: Response) => {
     }
 }
 
+export const updateTourStatus = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params
+        const { status } = req.body
+
+        if (!status || !["active", "sold"].includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid status. Must be 'active' or 'sold'",
+            })
+        }
+
+        const tour = await Tour.findByIdAndUpdate(id, { status }, { new: true, runValidators: true })
+
+        if (!tour) {
+            return res.status(404).json({
+                success: false,
+                message: "Tour not found",
+            })
+        }
+
+        res.json({
+            success: true,
+            message: "Tour status updated successfully",
+            data: tour,
+        })
+    } catch (error: any) {
+        console.error("Error updating tour status:", error)
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        })
+    }
+}
+
 export const checkSlugAvailability = async (req: Request, res: Response) => {
     try {
         const { slug } = req.params

@@ -5,6 +5,7 @@ import {
     getTourById,
     getTourBySlug,
     updateTour,
+    updateTourStatus,
     deleteTour,
     checkSlugAvailability,
 } from "../controllers/tour.controller"
@@ -28,6 +29,9 @@ router.get("/:id", getTourById)
 
 // Update tour
 router.put("/:id", updateTour)
+
+// Update tour status (partial update)
+router.patch("/:id", updateTourStatus)
 
 // Delete tour
 router.delete("/:id", deleteTour)
