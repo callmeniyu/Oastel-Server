@@ -14,8 +14,8 @@ router.post("/tour-image", uploadTourImage, processImage, (req: Request, res: Re
             })
         }
 
-        // Generate URL for the uploaded image
-        const imageUrl = `/uploads/tours/${req.file.filename}`
+        // Cloudinary returns the full URL in req.file.path
+        const imageUrl = req.file.path
 
         res.status(200).json({
             success: true,

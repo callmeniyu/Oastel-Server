@@ -1,26 +1,35 @@
 import multer from "multer"
-import path from "path"
-import fs from "fs"
-import sharp from "sharp"
+import { v2 as cloudinary } from "cloudinary"
+import { CloudinaryStorage } from "multer-storage-cloudinary"
 import { Request, Response, NextFunction } from "express"
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, "../../uploads/tours")
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true })
-}
+// Configure Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+})
 
-// Configure multer storage
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadsDir)
-    },
-    filename: (req, file, cb) => {
-        // Generate unique filename with timestamp
-        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9)
-        const extension = path.extname(file.originalname)
-        cb(null, `tour-${uniqueSuffix}${extension}`)
-    },
+// Configure Cloudinary storage
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: "oastel/tours", // Folder in Cloudinary
+        allowed_formats: ["jpg", "jpeg", "png", "webp"],
+        transformation: [
+            {
+                width: 1200,
+                height: 800,
+                crop: "fill",
+                quality: "auto:good",
+            },
+        ],
+        public_id: (req: any, file: any) => {
+            // Generate unique public ID
+            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9)
+            return `tour-${uniqueSuffix}`
+        },
+    } as any,
 })
 
 // File filter for images only
@@ -32,7 +41,7 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
     }
 }
 
-// Configure multer
+// Configure multer with Cloudinary storage
 const upload = multer({
     storage,
     fileFilter,
@@ -41,58 +50,26 @@ const upload = multer({
     },
 })
 
-// Image processing middleware
+// No need for image processing middleware - Cloudinary handles it
 export const processImage = async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.file) {
-        return next()
-    }
-
-    try {
-        const originalPath = req.file.path
-        const processedPath = originalPath.replace(/\.[^/.]+$/, "-processed.jpg")
-
-        // Process image with sharp - resize and optimize
-        await sharp(originalPath)
-            .resize(1200, 800, {
-                fit: "cover",
-                position: "center",
-            })
-            .jpeg({ quality: 85 })
-            .toFile(processedPath)
-
-        // Delete original file (with retry for Windows)
-        setTimeout(() => {
-            try {
-                if (fs.existsSync(originalPath)) {
-                    fs.unlinkSync(originalPath)
-                }
-            } catch (unlinkError) {
-                console.warn("Could not delete original file:", unlinkError)
-            }
-        }, 100)
-
-        // Update file path
-        req.file.path = processedPath
-        req.file.filename = path.basename(processedPath)
-
-        next()
-    } catch (error) {
-        console.error("Error processing image:", error)
-        next(error)
-    }
+    // Cloudinary automatically processes images, so we just continue
+    next()
 }
 
-// Delete old image file
-export const deleteOldImage = (imagePath: string) => {
+// Delete image from Cloudinary
+export const deleteOldImage = async (imagePath: string) => {
     try {
-        if (imagePath && imagePath.startsWith("/uploads/")) {
-            const fullPath = path.join(__dirname, "../..", imagePath)
-            if (fs.existsSync(fullPath)) {
-                fs.unlinkSync(fullPath)
-            }
+        if (imagePath && imagePath.includes("cloudinary.com")) {
+            // Extract public_id from Cloudinary URL
+            const urlParts = imagePath.split("/")
+            const filename = urlParts[urlParts.length - 1]
+            const publicId = `oastel/tours/${filename.split(".")[0]}`
+
+            await cloudinary.uploader.destroy(publicId)
+            console.log(`Deleted image from Cloudinary: ${publicId}`)
         }
     } catch (error) {
-        console.error("Error deleting old image:", error)
+        console.error("Error deleting image from Cloudinary:", error)
     }
 }
 
