@@ -1,7 +1,6 @@
 import { Request, Response } from "express"
 import Tour, { TourType } from "../models/Tour"
 import { generateSlug } from "../utils/generateSlug"
-import { deleteOldImage } from "../middleware/upload"
 
 export const createTour = async (req: Request, res: Response) => {
     try {
@@ -187,10 +186,8 @@ export const updateTour = async (req: Request, res: Response) => {
             tourData.details.faq = tourData.details.faq.filter((faq: any) => faq.question.trim() && faq.answer.trim())
         }
 
-        // If image is changed and old image was uploaded (starts with /uploads/), delete it
-        if (tourData.image && tourData.image !== existingTour.image && existingTour.image?.startsWith("/uploads/")) {
-            deleteOldImage(existingTour.image)
-        }
+        // Note: With Cloudinary, we don't need to delete old images locally
+        // Cloudinary handles storage and we can optionally clean up old images via their API
 
         const tour = await Tour.findByIdAndUpdate(id, tourData, { new: true, runValidators: true })
 
