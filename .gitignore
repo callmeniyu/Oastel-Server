@@ -124,6 +124,10 @@ out
 .nuxt
 dist
 
+# Uploads directory - keep the structure but ignore files
+uploads/*
+!uploads/.gitkeep
+
 # Gatsby files
 .cache/
 # Comment in the public line in if your project uses Gatsby and not Next.js
