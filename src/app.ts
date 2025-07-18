@@ -4,6 +4,7 @@ import helmet from "helmet"
 import { env } from "./config/env"
 import userRoutes from "./routes/user.routes"
 import tourRoutes from "./routes/tour.routes"
+import transferRoutes from "./routes/transfer.routes"
 import uploadRoutes from "./routes/upload.routes"
 import connectDB from "./config/db"
 
@@ -22,6 +23,7 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }))
 // Routes
 app.use("/api/users", userRoutes)
 app.use("/api/tours", tourRoutes)
+app.use("/api/transfers", transferRoutes)
 app.use("/api/upload", uploadRoutes)
 
 // Health check
