@@ -35,11 +35,6 @@ export const createTransfer = async (req: Request, res: Response) => {
             transferData.label = null
         }
 
-        // Ensure status is set (default to "active" if not provided)
-        if (!transferData.status) {
-            transferData.status = "active"
-        }
-
         const transfer = new Transfer(transferData)
         const savedTransfer = await transfer.save()
 
@@ -75,7 +70,7 @@ export const createTransfer = async (req: Request, res: Response) => {
 
 export const getTransfers = async (req: Request, res: Response) => {
     try {
-        const { page = 1, limit = 10, type, search, status } = req.query
+        const { page = 1, limit = 10, type, search } = req.query
 
         const query: any = {}
 
@@ -83,23 +78,13 @@ export const getTransfers = async (req: Request, res: Response) => {
             query.type = type
         }
 
-        if (status && status !== "all") {
-            query.status = status
-        }
-
         if (search) {
-            query.$or = [
-                { title: { $regex: search, $options: "i" } },
-                { desc: { $regex: search, $options: "i" } },
-                { tags: { $in: [new RegExp(search as string, "i")] } },
-                { from: { $regex: search, $options: "i" } },
-                { to: { $regex: search, $options: "i" } },
-            ]
+            query.$or = [{ title: { $regex: search, $options: "i" } }, { desc: { $regex: search, $options: "i" } }]
         }
 
         const skip = (Number(page) - 1) * Number(limit)
 
-        const transfers = await Transfer.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit))
+        const transfers = await Transfer.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean() // Use lean() for better performance
 
         const total = await Transfer.countDocuments(query)
 
@@ -125,8 +110,7 @@ export const getTransfers = async (req: Request, res: Response) => {
 export const getTransferById = async (req: Request, res: Response) => {
     try {
         const { id } = req.params
-
-        const transfer = await Transfer.findById(id)
+        const transfer = await Transfer.findById(id).lean() // Use lean() for better performance
 
         if (!transfer) {
             return res.status(404).json({
@@ -151,8 +135,7 @@ export const getTransferById = async (req: Request, res: Response) => {
 export const getTransferBySlug = async (req: Request, res: Response) => {
     try {
         const { slug } = req.params
-
-        const transfer = await Transfer.findOne({ slug })
+        const transfer = await Transfer.findOne({ slug }).lean() // Use lean() for better performance
 
         if (!transfer) {
             return res.status(404).json({
@@ -177,33 +160,36 @@ export const getTransferBySlug = async (req: Request, res: Response) => {
 export const updateTransfer = async (req: Request, res: Response) => {
     try {
         const { id } = req.params
-        const updateData = req.body
+        const transferData = req.body
+
+        // Get existing transfer to check if image changed
+        const existingTransfer = await Transfer.findById(id)
+        if (!existingTransfer) {
+            return res.status(404).json({
+                success: false,
+                message: "Transfer not found",
+            })
+        }
 
         // Ensure packageType is always 'transfer'
-        updateData.packageType = "transfer"
+        transferData.packageType = "transfer"
 
         // Handle label - convert "None" to null
-        if (updateData.label === "None") {
-            updateData.label = null
+        if (transferData.label === "None") {
+            transferData.label = null
         }
 
         // Filter out empty FAQ items
-        if (updateData.details && updateData.details.faq) {
-            updateData.details.faq = updateData.details.faq.filter((faq: any) => faq.question.trim() && faq.answer.trim())
+        if (transferData.details && transferData.details.faq) {
+            transferData.details.faq = transferData.details.faq.filter(
+                (faq: any) => faq.question.trim() && faq.answer.trim()
+            )
         }
 
-        // If slug is being updated, check for uniqueness
-        if (updateData.slug) {
-            const existingTransfer = await Transfer.findOne({ slug: updateData.slug, _id: { $ne: id } })
-            if (existingTransfer) {
-                return res.status(400).json({
-                    success: false,
-                    message: "A transfer with this slug already exists",
-                })
-            }
-        }
+        // Note: With Cloudinary, we don't need to delete old images locally
+        // Cloudinary handles storage and we can optionally clean up old images via their API
 
-        const transfer = await Transfer.findByIdAndUpdate(id, updateData, { new: true, runValidators: true })
+        const transfer = await Transfer.findByIdAndUpdate(id, transferData, { new: true, runValidators: true })
 
         if (!transfer) {
             return res.status(404).json({
@@ -228,13 +214,31 @@ export const updateTransfer = async (req: Request, res: Response) => {
             })
         }
 
-        if (error.code === 11000) {
-            return res.status(400).json({
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        })
+    }
+}
+
+export const deleteTransfer = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params
+        const transfer = await Transfer.findByIdAndDelete(id)
+
+        if (!transfer) {
+            return res.status(404).json({
                 success: false,
-                message: "A transfer with this slug already exists",
+                message: "Transfer not found",
             })
         }
 
+        res.json({
+            success: true,
+            message: "Transfer deleted successfully",
+        })
+    } catch (error: any) {
+        console.error("Error deleting transfer:", error)
         res.status(500).json({
             success: false,
             message: "Internal server error",
@@ -247,7 +251,7 @@ export const updateTransferStatus = async (req: Request, res: Response) => {
         const { id } = req.params
         const { status } = req.body
 
-        if (!["active", "sold"].includes(status)) {
+        if (!status || !["active", "sold"].includes(status)) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid status. Must be 'active' or 'sold'",
@@ -277,37 +281,17 @@ export const updateTransferStatus = async (req: Request, res: Response) => {
     }
 }
 
-export const deleteTransfer = async (req: Request, res: Response) => {
-    try {
-        const { id } = req.params
-
-        const transfer = await Transfer.findByIdAndDelete(id)
-
-        if (!transfer) {
-            return res.status(404).json({
-                success: false,
-                message: "Transfer not found",
-            })
-        }
-
-        res.json({
-            success: true,
-            message: "Transfer deleted successfully",
-        })
-    } catch (error: any) {
-        console.error("Error deleting transfer:", error)
-        res.status(500).json({
-            success: false,
-            message: "Internal server error",
-        })
-    }
-}
-
 export const checkSlugAvailability = async (req: Request, res: Response) => {
     try {
         const { slug } = req.params
+        const { excludeId } = req.query
 
-        const existingTransfer = await Transfer.findOne({ slug })
+        const query: any = { slug }
+        if (excludeId) {
+            query._id = { $ne: excludeId }
+        }
+
+        const existingTransfer = await Transfer.findOne(query)
 
         res.json({
             success: true,

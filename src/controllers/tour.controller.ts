@@ -77,16 +77,12 @@ export const getTours = async (req: Request, res: Response) => {
         }
 
         if (search) {
-            query.$or = [
-                { title: { $regex: search, $options: "i" } },
-                { description: { $regex: search, $options: "i" } },
-                { tags: { $in: [new RegExp(search as string, "i")] } },
-            ]
+            query.$or = [{ title: { $regex: search, $options: "i" } }, { description: { $regex: search, $options: "i" } }]
         }
 
         const skip = (Number(page) - 1) * Number(limit)
 
-        const tours = await Tour.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit))
+        const tours = await Tour.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean() // Use lean() for better performance
 
         const total = await Tour.countDocuments(query)
 
@@ -112,7 +108,7 @@ export const getTours = async (req: Request, res: Response) => {
 export const getTourById = async (req: Request, res: Response) => {
     try {
         const { id } = req.params
-        const tour = await Tour.findById(id)
+        const tour = await Tour.findById(id).lean() // Use lean() for better performance
 
         if (!tour) {
             return res.status(404).json({
@@ -137,7 +133,7 @@ export const getTourById = async (req: Request, res: Response) => {
 export const getTourBySlug = async (req: Request, res: Response) => {
     try {
         const { slug } = req.params
-        const tour = await Tour.findOne({ slug })
+        const tour = await Tour.findOne({ slug }).lean() // Use lean() for better performance
 
         if (!tour) {
             return res.status(404).json({

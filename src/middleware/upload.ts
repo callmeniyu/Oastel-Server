@@ -10,8 +10,8 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 })
 
-// Configure Cloudinary storage
-const storage = new CloudinaryStorage({
+// Configure Cloudinary storage for tours
+const tourStorage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
         folder: "oastel/tours", // Folder in Cloudinary
@@ -32,6 +32,50 @@ const storage = new CloudinaryStorage({
     } as any,
 })
 
+// Configure Cloudinary storage for blogs
+const blogStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: "oastel/blogs", // Folder in Cloudinary
+        allowed_formats: ["jpg", "jpeg", "png", "webp"],
+        transformation: [
+            {
+                width: 1200,
+                height: 800,
+                crop: "fill",
+                quality: "auto:good",
+            },
+        ],
+        public_id: (req: any, file: any) => {
+            // Generate unique public ID
+            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9)
+            return `blog-${uniqueSuffix}`
+        },
+    } as any,
+})
+
+// Configure Cloudinary storage for transfers
+const transferStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: "oastel/transfers", // Folder in Cloudinary
+        allowed_formats: ["jpg", "jpeg", "png", "webp"],
+        transformation: [
+            {
+                width: 1200,
+                height: 800,
+                crop: "fill",
+                quality: "auto:good",
+            },
+        ],
+        public_id: (req: any, file: any) => {
+            // Generate unique public ID
+            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9)
+            return `transfer-${uniqueSuffix}`
+        },
+    } as any,
+})
+
 // File filter for images only
 const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     if (file.mimetype.startsWith("image/")) {
@@ -41,9 +85,27 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
     }
 }
 
-// Configure multer with Cloudinary storage
-const upload = multer({
-    storage,
+// Configure multer with Cloudinary storage for tours
+const tourUpload = multer({
+    storage: tourStorage,
+    fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+})
+
+// Configure multer with Cloudinary storage for blogs
+const blogUpload = multer({
+    storage: blogStorage,
+    fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+})
+
+// Configure multer with Cloudinary storage for transfers
+const transferUpload = multer({
+    storage: transferStorage,
     fileFilter,
     limits: {
         fileSize: 5 * 1024 * 1024, // 5MB limit
@@ -63,14 +125,27 @@ export const deleteOldImage = async (imagePath: string) => {
             // Extract public_id from Cloudinary URL
             const urlParts = imagePath.split("/")
             const filename = urlParts[urlParts.length - 1]
-            const publicId = `oastel/tours/${filename.split(".")[0]}`
+            let publicId = ""
 
-            await cloudinary.uploader.destroy(publicId)
-            console.log(`Deleted image from Cloudinary: ${publicId}`)
+            // Determine folder based on URL path
+            if (imagePath.includes("/tours/")) {
+                publicId = `oastel/tours/${filename.split(".")[0]}`
+            } else if (imagePath.includes("/blogs/")) {
+                publicId = `oastel/blogs/${filename.split(".")[0]}`
+            } else if (imagePath.includes("/transfers/")) {
+                publicId = `oastel/transfers/${filename.split(".")[0]}`
+            }
+
+            if (publicId) {
+                await cloudinary.uploader.destroy(publicId)
+                console.log(`Deleted image from Cloudinary: ${publicId}`)
+            }
         }
     } catch (error) {
         console.error("Error deleting image from Cloudinary:", error)
     }
 }
 
-export const uploadTourImage = upload.single("image")
+export const uploadTourImage = tourUpload.single("image")
+export const uploadBlogImage = blogUpload.single("image")
+export const uploadTransferImage = transferUpload.single("image")

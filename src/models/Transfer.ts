@@ -1,4 +1,3 @@
-// src/models/Transfer.ts
 import { Schema, model, Document, Types } from "mongoose"
 import { FAQType } from "./common"
 
@@ -10,26 +9,27 @@ export interface TransferDetails {
     note?: string
     faq: Types.DocumentArray<FAQType>
 }
+
 export interface TransferType extends Document {
-    slug: string
     title: string
+    slug: string
     image: string
-    from: string
-    to: string
     tags: string[]
     desc: string
     type: "Van" | "Van + Ferry" | "Private"
     packageType: "transfer"
     duration: string
+    status: "active" | "sold"
     bookedCount: number
     oldPrice: number
     newPrice: number
     childPrice: number
     minimumPerson: number
     maximumPerson?: number
-    times: string[] // e.g. ["08:00 AM","05:00 PM"]
+    times: string[] // e.g. ["08:00 AM","01:30 PM"]
     label?: "Recommended" | "Popular" | "Best Value"
-    status: "active" | "sold"
+    from: string
+    to: string
     details: TransferDetails
     createdAt: Date
     updatedAt: Date
@@ -37,16 +37,15 @@ export interface TransferType extends Document {
 
 const TransferSchema = new Schema<TransferType>(
     {
+        title: { type: String, required: true },
         slug: { type: String, required: true, unique: true },
-        title: String,
         image: String,
-        from: String,
-        to: String,
         tags: [String],
         desc: String,
         type: { type: String, enum: ["Van", "Van + Ferry", "Private"] },
         packageType: { type: String, default: "transfer" },
         duration: String,
+        status: { type: String, enum: ["active", "sold"], default: "active" },
         bookedCount: { type: Number, default: 0 },
         oldPrice: Number,
         newPrice: Number,
@@ -55,11 +54,12 @@ const TransferSchema = new Schema<TransferType>(
         maximumPerson: Number,
         times: [String],
         label: { type: String, enum: ["Recommended", "Popular", "Best Value"], default: null },
-        status: { type: String, enum: ["active", "sold"], default: "active" },
+        from: String,
+        to: String,
         details: {
             about: String,
             itinerary: String,
-            pickupOption: { type: String, enum: ["admin", "user"], default: "admin" },
+            pickupOption: { type: String, enum: ["admin", "user"] },
             pickupLocations: String,
             note: String,
             faq: [
@@ -72,5 +72,11 @@ const TransferSchema = new Schema<TransferType>(
     },
     { timestamps: true }
 )
+
+// Add database indexes for better query performance
+TransferSchema.index({ slug: 1 }) // For slug-based lookups
+TransferSchema.index({ type: 1 }) // For type filtering
+TransferSchema.index({ status: 1 }) // For status filtering
+TransferSchema.index({ createdAt: -1 }) // For sorting by creation date
 
 export default model<TransferType>("Transfer", TransferSchema)

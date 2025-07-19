@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express"
-import { uploadTourImage, processImage, deleteOldImage } from "../middleware/upload"
+import { uploadTourImage, uploadBlogImage, uploadTransferImage, processImage, deleteOldImage } from "../middleware/upload"
 import path from "path"
 
 const router = Router()
@@ -32,6 +32,72 @@ router.post("/tour-image", uploadTourImage, processImage, (req: Request, res: Re
         res.status(500).json({
             success: false,
             message: "Error uploading image",
+            error: error.message,
+        })
+    }
+})
+
+// Upload single blog image
+router.post("/blog-image", uploadBlogImage, processImage, (req: Request, res: Response) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "No image file provided",
+            })
+        }
+
+        // Cloudinary returns the full URL in req.file.path
+        const imageUrl = req.file.path
+
+        res.status(200).json({
+            success: true,
+            message: "Blog image uploaded successfully",
+            data: {
+                imageUrl,
+                filename: req.file.filename,
+                originalName: req.file.originalname,
+                size: req.file.size,
+            },
+        })
+    } catch (error: any) {
+        console.error("Blog upload error:", error)
+        res.status(500).json({
+            success: false,
+            message: "Error uploading blog image",
+            error: error.message,
+        })
+    }
+})
+
+// Upload single transfer image
+router.post("/transfer-image", uploadTransferImage, processImage, (req: Request, res: Response) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "No image file provided",
+            })
+        }
+
+        // Cloudinary returns the full URL in req.file.path
+        const imageUrl = req.file.path
+
+        res.status(200).json({
+            success: true,
+            message: "Transfer image uploaded successfully",
+            data: {
+                imageUrl,
+                filename: req.file.filename,
+                originalName: req.file.originalname,
+                size: req.file.size,
+            },
+        })
+    } catch (error: any) {
+        console.error("Transfer upload error:", error)
+        res.status(500).json({
+            success: false,
+            message: "Error uploading transfer image",
             error: error.message,
         })
     }

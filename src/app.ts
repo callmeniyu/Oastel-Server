@@ -6,6 +6,7 @@ import userRoutes from "./routes/user.routes"
 import tourRoutes from "./routes/tour.routes"
 import transferRoutes from "./routes/transfer.routes"
 import uploadRoutes from "./routes/upload.routes"
+import blogRoutes from "./routes/blog.routes"
 import connectDB from "./config/db"
 
 const app = express()
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }))
 app.use("/api/users", userRoutes)
 app.use("/api/tours", tourRoutes)
 app.use("/api/transfers", transferRoutes)
+app.use("/api/blogs", blogRoutes)
 app.use("/api/upload", uploadRoutes)
 
 // Health check

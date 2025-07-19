@@ -69,4 +69,11 @@ const TourSchema = new Schema<TourType>(
     { timestamps: true }
 )
 
+// Add database indexes for better query performance
+TourSchema.index({ slug: 1 }) // For slug-based lookups
+TourSchema.index({ type: 1 }) // For type filtering
+TourSchema.index({ status: 1 }) // For status filtering
+TourSchema.index({ createdAt: -1 }) // For sorting by creation date
+TourSchema.index({ title: 1 }) // For title search
+
 export default model<TourType>("Tour", TourSchema)
