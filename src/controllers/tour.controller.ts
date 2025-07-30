@@ -1,6 +1,8 @@
 import { Request, Response } from "express"
+import { Types } from "mongoose"
 import Tour, { TourType } from "../models/Tour"
 import { generateSlug } from "../utils/generateSlug"
+import { TimeSlotService } from "../services/timeSlot.service"
 
 export const createTour = async (req: Request, res: Response) => {
     try {
@@ -35,6 +37,20 @@ export const createTour = async (req: Request, res: Response) => {
 
         const tour = new Tour(tourData)
         const savedTour = await tour.save()
+
+        // Generate time slots for the tour (90 days ahead)
+        try {
+            await TimeSlotService.generateSlotsForPackage(
+                "tour",
+                savedTour._id as Types.ObjectId,
+                tourData.departureTimes || [],
+                tourData.maximumPerson || 10
+            )
+            console.log(`Time slots generated for tour: ${savedTour._id}`)
+        } catch (slotError) {
+            console.error("Error generating time slots for tour:", slotError)
+            // Don't fail the tour creation if slot generation fails
+        }
 
         res.status(201).json({
             success: true,
@@ -194,6 +210,26 @@ export const updateTour = async (req: Request, res: Response) => {
             })
         }
 
+        // Update time slots if departure times or capacity changed
+        try {
+            const departureTimes = tourData.departureTimes || existingTour.departureTimes
+            const capacity = tourData.maximumPerson || existingTour.maximumPerson || 10
+            
+            if (JSON.stringify(departureTimes) !== JSON.stringify(existingTour.departureTimes) || 
+                capacity !== existingTour.maximumPerson) {
+                await TimeSlotService.updateSlotsForPackage(
+                    "tour",
+                    tour._id as Types.ObjectId,
+                    departureTimes,
+                    capacity
+                )
+                console.log(`Time slots updated for tour: ${tour._id}`)
+            }
+        } catch (slotError) {
+            console.error("Error updating time slots for tour:", slotError)
+            // Don't fail the tour update if slot update fails
+        }
+
         res.json({
             success: true,
             message: "Tour updated successfully",
@@ -227,6 +263,15 @@ export const deleteTour = async (req: Request, res: Response) => {
                 success: false,
                 message: "Tour not found",
             })
+        }
+
+        // Delete all time slots for this tour
+        try {
+            await TimeSlotService.deleteSlotsForPackage("tour", tour._id as Types.ObjectId)
+            console.log(`Time slots deleted for tour: ${tour._id}`)
+        } catch (slotError) {
+            console.error("Error deleting time slots for tour:", slotError)
+            // Don't fail the tour deletion if slot deletion fails
         }
 
         res.json({

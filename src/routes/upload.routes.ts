@@ -1,11 +1,39 @@
-import { Router, Request, Response } from "express"
+import { Router, Request, Response, NextFunction } from "express"
 import { uploadTourImage, uploadBlogImage, uploadTransferImage, processImage, deleteOldImage } from "../middleware/upload"
 import path from "path"
 
 const router = Router()
 
+// Error handling middleware for multer errors
+const handleMulterError = (err: any, req: Request, res: Response, next: NextFunction) => {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+            success: false,
+            message: "File too large. Maximum size is 5MB"
+        })
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({
+            success: false,
+            message: "Unexpected field name for file upload"
+        })
+    }
+    next(err)
+}
+
 // Upload single tour image
-router.post("/tour-image", uploadTourImage, processImage, (req: Request, res: Response) => {
+router.post("/tour-image", (req: Request, res: Response, next: NextFunction) => {
+    uploadTourImage(req, res, (err: any) => {
+        if (err) {
+            console.error("Multer Error:", err)
+            return res.status(400).json({
+                success: false,
+                message: err.message || "Error uploading file"
+            })
+        }
+        next()
+    })
+}, processImage, (req: Request, res: Response) => {
     try {
         if (!req.file) {
             return res.status(400).json({

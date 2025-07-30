@@ -1,39 +1,92 @@
-// src/models/Booking.ts
-import { Schema, model, Document, Types } from "mongoose"
+import mongoose, { Schema, Document } from "mongoose";
 
-export interface BookingType extends Document {
-  userId: Types.ObjectId        // reference User
-  packageType: "tour"|"transfer"
-  packageId: Types.ObjectId     // reference Tour or Transfer
-  date: string                   // ISO date
-  time: string
-  adults: number
-  children: number
-  adultPrice: number
-  childPrice: number
-  totalPrice: number
-  pickupLocations: string[]
-  status: "pending"|"confirmed"|"cancelled"
-  createdAt: Date
-  updatedAt: Date
+export interface PaymentInfo {
+  paymentIntentId?: string;
+  paymentStatus: 'pending' | 'processing' | 'succeeded' | 'failed';
+  amount: number;
+  bankCharge: number;
+  currency: string;
+  paymentMethod?: string;
+  refundStatus?: 'none' | 'partial' | 'full';
+  refundAmount?: number;
 }
 
-const BookingSchema = new Schema<BookingType>(
+export interface ContactInfo {
+  name: string;
+  email: string;
+  phone: string;
+  whatsapp?: string;
+}
+
+export interface Booking extends Document {
+  userId?: mongoose.Types.ObjectId;
+  packageType: "tour" | "transfer";
+  packageId: mongoose.Types.ObjectId;
+  slotId?: mongoose.Types.ObjectId;
+  date: Date;
+  time: string;
+  adults: number;
+  children: number;
+  pickupLocation: string;
+  status: "pending" | "confirmed" | "cancelled";
+  firstBookingMinimum: boolean;
+  contactInfo: ContactInfo;
+  paymentInfo: PaymentInfo;
+  subtotal: number;
+  total: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const BookingSchema: Schema = new Schema(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    packageType: { type: String, enum: ["tour","transfer"], required: true },
+    userId: { type: Schema.Types.ObjectId, required: false, ref: "User" },
+    packageType: { type: String, enum: ["tour", "transfer"], required: true },
     packageId: { type: Schema.Types.ObjectId, required: true, refPath: "packageType" },
-    date: String,
-    time: String,
-    adults: Number,
-    children: Number,
-    adultPrice: Number,
-    childPrice: Number,
-    totalPrice: Number,
-    pickupLocations: [String],
-    status: { type: String, enum: ["pending","confirmed","cancelled"], default: "pending" },
+    slotId: { type: Schema.Types.ObjectId, required: false, ref: "TimeSlot" },
+    date: { type: Date, required: true },
+    time: { type: String, required: true },
+    adults: { type: Number, required: true, min: 1 },
+    children: { type: Number, required: true, min: 0 },
+    pickupLocation: { type: String, required: true },
+    status: { type: String, enum: ["pending", "confirmed", "cancelled"], default: "pending" },
+    firstBookingMinimum: { type: Boolean, default: false },
+    contactInfo: {
+      name: { type: String, required: true },
+      email: { type: String, required: true },
+      phone: { type: String, required: true },
+      whatsapp: String
+    },
+    paymentInfo: {
+      paymentIntentId: String,
+      paymentStatus: {
+        type: String,
+        enum: ['pending', 'processing', 'succeeded', 'failed'],
+        default: 'pending'
+      },
+      amount: { type: Number, required: true },
+      bankCharge: { type: Number, required: true },
+      currency: { type: String, default: 'MYR' },
+      paymentMethod: String,
+      refundStatus: {
+        type: String,
+        enum: ['none', 'partial', 'full'],
+        default: 'none'
+      },
+      refundAmount: Number
+    },
+    subtotal: { type: Number, required: true },
+    total: { type: Number, required: true },
   },
   { timestamps: true }
-)
+);
 
-export default model<BookingType>("Booking", BookingSchema)
+// Add database indexes for better query performance
+BookingSchema.index({ userId: 1, status: 1 });
+BookingSchema.index({ packageId: 1, date: 1 });
+BookingSchema.index({ slotId: 1 });
+BookingSchema.index({ status: 1, date: 1 });
+BookingSchema.index({ 'paymentInfo.paymentStatus': 1 });
+BookingSchema.index({ createdAt: -1 });
+
+export default mongoose.models.Booking || mongoose.model<Booking>("Booking", BookingSchema);

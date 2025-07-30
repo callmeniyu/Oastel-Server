@@ -1,6 +1,8 @@
 import { Request, Response } from "express"
+import { Types } from "mongoose"
 import Transfer, { TransferType } from "../models/Transfer"
 import { generateSlug } from "../utils/generateSlug"
+import { TimeSlotService } from "../services/timeSlot.service"
 
 export const createTransfer = async (req: Request, res: Response) => {
     try {
@@ -37,6 +39,20 @@ export const createTransfer = async (req: Request, res: Response) => {
 
         const transfer = new Transfer(transferData)
         const savedTransfer = await transfer.save()
+
+        // Generate time slots for the transfer (90 days ahead)
+        try {
+            await TimeSlotService.generateSlotsForPackage(
+                "transfer",
+                savedTransfer._id as Types.ObjectId,
+                transferData.times || [],
+                transferData.maximumPerson || 10
+            )
+            console.log(`Time slots generated for transfer: ${savedTransfer._id}`)
+        } catch (slotError) {
+            console.error("Error generating time slots for transfer:", slotError)
+            // Don't fail the transfer creation if slot generation fails
+        }
 
         res.status(201).json({
             success: true,
@@ -198,6 +214,26 @@ export const updateTransfer = async (req: Request, res: Response) => {
             })
         }
 
+        // Update time slots if times or capacity changed
+        try {
+            const times = transferData.times || existingTransfer.times
+            const capacity = transferData.maximumPerson || existingTransfer.maximumPerson || 10
+            
+            if (JSON.stringify(times) !== JSON.stringify(existingTransfer.times) || 
+                capacity !== existingTransfer.maximumPerson) {
+                await TimeSlotService.updateSlotsForPackage(
+                    "transfer",
+                    transfer._id as Types.ObjectId,
+                    times,
+                    capacity
+                )
+                console.log(`Time slots updated for transfer: ${transfer._id}`)
+            }
+        } catch (slotError) {
+            console.error("Error updating time slots for transfer:", slotError)
+            // Don't fail the transfer update if slot update fails
+        }
+
         res.json({
             success: true,
             message: "Transfer updated successfully",
@@ -231,6 +267,15 @@ export const deleteTransfer = async (req: Request, res: Response) => {
                 success: false,
                 message: "Transfer not found",
             })
+        }
+
+        // Delete all time slots for this transfer
+        try {
+            await TimeSlotService.deleteSlotsForPackage("transfer", transfer._id as Types.ObjectId)
+            console.log(`Time slots deleted for transfer: ${transfer._id}`)
+        } catch (slotError) {
+            console.error("Error deleting time slots for transfer:", slotError)
+            // Don't fail the transfer deletion if slot deletion fails
         }
 
         res.json({

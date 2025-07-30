@@ -1,39 +1,32 @@
 import express from "express"
 import cors from "cors"
+import morgan from "morgan"
 import helmet from "helmet"
-import { env } from "./config/env"
-import userRoutes from "./routes/user.routes"
 import tourRoutes from "./routes/tour.routes"
 import transferRoutes from "./routes/transfer.routes"
-import uploadRoutes from "./routes/upload.routes"
+import bookingRoutes from "./routes/booking.routes"
+import blackoutDateRoutes from "./routes/blackoutDate.routes"
 import blogRoutes from "./routes/blog.routes"
-import connectDB from "./config/db"
+import uploadRoutes from "./routes/upload.routes"
+import timeSlotRoutes from "./routes/timeSlot.routes"
 
 const app = express()
 
-// Middleware
-app.use(helmet())
-app.use(
-    cors({
-        origin: env.CORS_ORIGIN.split(",").map((origin) => origin.trim()),
-    })
-)
-app.use(express.json({ limit: "10mb" }))
-app.use(express.urlencoded({ limit: "10mb", extended: true }))
+app.use(cors())
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}))
+app.use(morgan("dev"))
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 
-// Routes
-app.use("/api/users", userRoutes)
 app.use("/api/tours", tourRoutes)
 app.use("/api/transfers", transferRoutes)
+app.use("/api/bookings", bookingRoutes)
+app.use("/api/blackout-dates", blackoutDateRoutes)
 app.use("/api/blogs", blogRoutes)
 app.use("/api/upload", uploadRoutes)
+app.use("/api/timeslots", timeSlotRoutes)
 
-// Health check
-app.get("/api/health", (req, res) => {
-    res.status(200).json({ status: "OK" })
-})
-
-// Connect to DB
-connectDB()
 
 export default app

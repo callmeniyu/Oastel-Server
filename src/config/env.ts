@@ -11,6 +11,27 @@ const envSchema = z.object({
     MONGO_URI: z.string(),
     JWT_SECRET: z.string(),
     CORS_ORIGIN: z.string(),
+    CLOUDINARY_CLOUD_NAME: z.string(),
+    CLOUDINARY_API_KEY: z.string(),
+    CLOUDINARY_API_SECRET: z.string(),
 })
 
-export const env = envSchema.parse(process.env)
+// Parse and validate environment variables
+const parsedEnv = envSchema.safeParse(process.env)
+
+if (!parsedEnv.success) {
+    console.error("❌ Invalid environment variables:", parsedEnv.error.format())
+    throw new Error("Invalid environment configuration")
+}
+
+// Export type-safe environment variables
+export const env = {
+    NODE_ENV: parsedEnv.data.NODE_ENV,
+    PORT: parsedEnv.data.PORT,
+    MONGO_URI: parsedEnv.data.MONGO_URI,
+    JWT_SECRET: parsedEnv.data.JWT_SECRET,
+    CORS_ORIGIN: parsedEnv.data.CORS_ORIGIN,
+    CLOUDINARY_CLOUD_NAME: parsedEnv.data.CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY: parsedEnv.data.CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET: parsedEnv.data.CLOUDINARY_API_SECRET,
+}
