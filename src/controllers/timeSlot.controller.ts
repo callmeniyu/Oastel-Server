@@ -1,6 +1,8 @@
 import { Request, Response } from "express"
 import { TimeSlotService } from "../services/timeSlot.service"
 import { Types } from "mongoose"
+import Tour from "../models/Tour"
+import Transfer from "../models/Transfer"
 
 /**
  * Generate time slots for a package
@@ -40,11 +42,32 @@ export const generateSlots = async (req: Request, res: Response) => {
             })
         }
 
+        // Get package details to retrieve minimumPerson
+        let packageDetails
+        if (packageType === "tour") {
+            packageDetails = await Tour.findById(packageId)
+        } else {
+            packageDetails = await Transfer.findById(packageId)
+        }
+
+        if (!packageDetails) {
+            return res.status(404).json({
+                success: false,
+                message: "Package not found"
+            })
+        }
+
+        // ROBUST: Don't pass minimumPerson parameter - let service fetch it
+        console.log(`🎯 GENERATING SLOTS: ${packageType} ${packageId}`);
+        console.log(`   Package minimumPerson: ${packageDetails.minimumPerson}`);
+        console.log(`   Package type: ${packageDetails.type}`);
+
         await TimeSlotService.generateSlotsForPackage(
             packageType,
             new Types.ObjectId(packageId),
             departureTimes,
             capacity
+            // No minimumPerson parameter - service will fetch from package
         )
 
         res.status(201).json({
@@ -140,6 +163,67 @@ export const getAvailableSlots = async (req: Request, res: Response) => {
         })
     } catch (error: any) {
         console.error("Error getting available slots:", error)
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message
+        })
+    }
+}
+
+/**
+ * Toggle slot availability for a specific slot
+ */
+export const toggleSlotAvailability = async (req: Request, res: Response) => {
+    try {
+        const { packageType, packageId, date, time, isAvailable } = req.body
+
+        console.log("Toggle slot availability request:", { packageType, packageId, date, time, isAvailable })
+
+        if (!packageType || !packageId || !date || !time || typeof isAvailable !== 'boolean') {
+            return res.status(400).json({
+                success: false,
+                message: "Missing required fields: packageType, packageId, date, time, isAvailable"
+            })
+        }
+
+        if (!["tour", "transfer"].includes(packageType)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid packageType. Must be 'tour' or 'transfer'"
+            })
+        }
+
+        // Validate packageId is a valid ObjectId string
+        if (typeof packageId !== 'string' || packageId.length !== 24) {
+            return res.status(400).json({
+                success: false,
+                message: "packageId must be a valid 24-character ObjectId string"
+            })
+        }
+
+        const result = await TimeSlotService.toggleSlotAvailability(
+            packageType,
+            new Types.ObjectId(packageId),
+            date,
+            time,
+            isAvailable
+        )
+
+        if (!result) {
+            return res.status(404).json({
+                success: false,
+                message: "Slot not found for the specified parameters"
+            })
+        }
+
+        res.json({
+            success: true,
+            message: `Slot ${isAvailable ? 'enabled' : 'disabled'} successfully`,
+            data: result
+        })
+    } catch (error: any) {
+        console.error("Error toggling slot availability:", error)
         res.status(500).json({
             success: false,
             message: "Internal server error",

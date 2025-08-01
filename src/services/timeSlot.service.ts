@@ -6,14 +6,32 @@ import { Types } from "mongoose"
 export class TimeSlotService {
     /**
      * Generate time slots for a package (tour or transfer) for the next 90 days
+     * ROBUST IMPLEMENTATION: Always fetches package data to ensure correct minimumPerson
      */
     static async generateSlotsForPackage(
         packageType: "tour" | "transfer",
         packageId: Types.ObjectId,
         departureTimes: string[],
-        capacity: number
+        capacity: number,
+        minimumPerson?: number // Optional - will fetch from package if not provided
     ): Promise<void> {
         try {
+            // STEP 1: Always fetch package data to get correct minimumPerson
+            let packageDoc: any = null;
+            if (packageType === "tour") {
+                packageDoc = await Tour.findById(packageId);
+            } else {
+                packageDoc = await Transfer.findById(packageId);
+            }
+
+            if (!packageDoc) {
+                throw new Error(`Package ${packageType}/${packageId} not found`);
+            }
+
+            // Use package's minimumPerson value (override parameter if provided)
+            const packageMinimumPerson = packageDoc.minimumPerson || 1;
+            console.log(`🎯 SLOT GENERATION: ${packageType}/${packageId} - Using minimumPerson=${packageMinimumPerson} from package data`);
+
             const startDate = new Date()
             const endDate = new Date()
             endDate.setDate(startDate.getDate() + 90) // 90 days ahead
@@ -33,13 +51,20 @@ export class TimeSlotService {
                 })
 
                 if (!existingSlot) {
-                    // Create slots for each departure time
-                    const slots: Slot[] = departureTimes.map(time => ({
-                        time,
-                        capacity,
-                        bookedCount: 0,
-                        isAvailable: true // add isAvailable property
-                    }))
+                    // STEP 2: Create slots with package's minimumPerson value
+                    console.log(`📅 Creating slots for ${dateString} with minimumPerson=${packageMinimumPerson}`);
+                    
+                    const slots: Slot[] = departureTimes.map(time => {
+                        const slot = {
+                            time,
+                            capacity,
+                            bookedCount: 0,
+                            isAvailable: true,
+                            minimumPerson: packageMinimumPerson // ALWAYS use package value
+                        };
+                        console.log(`  ⏰ Slot ${time}: minimumPerson=${slot.minimumPerson}`);
+                        return slot;
+                    });
 
                     slotsToCreate.push({
                         packageType,
@@ -79,23 +104,6 @@ export class TimeSlotService {
         reason?: string
     }> {
         try {
-            // Check if this date is a blackout date for this package type
-            const BlackoutDate = (await import("../models/BlackoutDate")).default
-            const isBlackoutDate = await BlackoutDate.findOne({
-                date: new Date(date + 'T00:00:00.000Z'),
-                packageType
-            })
-
-            console.log(`Checking availability for ${packageType} on ${date}:`, !!isBlackoutDate ? 'BLACKOUT' : 'AVAILABLE')
-
-            if (isBlackoutDate) {
-                return {
-                    available: false,
-                    availableSlots: 0,
-                    reason: "Selected date is not available due to blackout restrictions"
-                }
-            }
-
             // Check if booking is within 10 hours of departure time
             const isBookingAllowed = this.isBookingAllowed(date, time)
             if (!isBookingAllowed) {
@@ -103,6 +111,22 @@ export class TimeSlotService {
                     available: false,
                     availableSlots: 0,
                     reason: "Booking closed - less than 10 hours before departure"
+                }
+            }
+
+            // Get package details to check if it's private
+            let packageDoc: any = null
+            if (packageType === "tour") {
+                packageDoc = await Tour.findById(packageId)
+            } else {
+                packageDoc = await Transfer.findById(packageId)
+            }
+
+            if (!packageDoc) {
+                return {
+                    available: false,
+                    availableSlots: 0,
+                    reason: "Package not found"
                 }
             }
 
@@ -133,6 +157,30 @@ export class TimeSlotService {
 
             const availableSlots = slot.capacity - slot.bookedCount
             
+            // Check minimum person requirement based on package type
+            const isPrivate = packageDoc.type === "private" || packageDoc.type === "Private"
+            const isFirstBooking = slot.bookedCount === 0
+            
+            let requiredMinimum: number
+            if (isPrivate) {
+                // For private packages, always use the original minimum person requirement
+                requiredMinimum = slot.minimumPerson
+            } else {
+                // For non-private packages, use the actual minimumPerson field from database
+                // (which gets updated to 1 after first booking in updateSlotBooking)
+                requiredMinimum = slot.minimumPerson
+            }
+            
+            // Validate minimum person requirement
+            if (requestedPersons < requiredMinimum) {
+                const bookingType = isPrivate ? "private" : (isFirstBooking ? "first" : "subsequent")
+                return {
+                    available: false,
+                    availableSlots,
+                    reason: `Minimum ${requiredMinimum} person${requiredMinimum > 1 ? 's' : ''} required for this ${bookingType} booking`
+                }
+            }
+            
             return {
                 available: availableSlots >= requestedPersons,
                 availableSlots,
@@ -146,6 +194,7 @@ export class TimeSlotService {
 
     /**
      * Update slot booking count when a booking is made
+     * ROBUST IMPLEMENTATION: Handles minimumPerson logic correctly
      */
     static async updateSlotBooking(
         packageType: "tour" | "transfer",
@@ -156,6 +205,22 @@ export class TimeSlotService {
         operation: "add" | "subtract" = "add"
     ): Promise<boolean> {
         try {
+            // STEP 1: Get package details to check if it's private
+            let packageDoc: any = null
+            if (packageType === "tour") {
+                packageDoc = await Tour.findById(packageId)
+            } else {
+                packageDoc = await Transfer.findById(packageId)
+            }
+
+            if (!packageDoc) {
+                throw new Error("Package not found")
+            }
+
+            const isPrivate = packageDoc.type === "private" || packageDoc.type === "Private";
+            console.log(`🎯 BOOKING UPDATE: ${packageType}/${packageId} - isPrivate=${isPrivate}`);
+
+            // STEP 2: Find the time slot
             const timeSlot = await TimeSlot.findOne({
                 packageType,
                 packageId,
@@ -171,8 +236,14 @@ export class TimeSlotService {
                 throw new Error("Specific time slot not found")
             }
 
-            // Update booked count
+            // STEP 3: Get current state and log it
             const currentBookedCount = timeSlot.slots[slotIndex].bookedCount
+            const currentMinimumPerson = timeSlot.slots[slotIndex].minimumPerson
+            
+            console.log(`� BEFORE UPDATE - Date: ${date}, Time: ${time}`);
+            console.log(`   BookedCount: ${currentBookedCount}, MinimumPerson: ${currentMinimumPerson}`);
+            
+            // STEP 4: Calculate new booked count
             const newBookedCount = operation === "add" 
                 ? currentBookedCount + personsCount 
                 : Math.max(0, currentBookedCount - personsCount)
@@ -182,10 +253,55 @@ export class TimeSlotService {
                 throw new Error("Booking would exceed slot capacity")
             }
 
-            timeSlot.slots[slotIndex].bookedCount = newBookedCount
-            await timeSlot.save()
+            // STEP 5: CORE LOGIC - Update minimumPerson for first booking
+            let newMinimumPerson = currentMinimumPerson;
+            
+            if (operation === "add" && currentBookedCount === 0 && newBookedCount > 0) {
+                // This is the FIRST booking for this slot
+                if (!isPrivate) {
+                    // For NON-PRIVATE packages, set minimumPerson to 1 after first booking
+                    newMinimumPerson = 1;
+                    console.log(`🚀 FIRST BOOKING DETECTED! Non-private package - Setting minimumPerson from ${currentMinimumPerson} to 1`);
+                } else {
+                    // For PRIVATE packages, keep original minimumPerson
+                    console.log(`🏠 FIRST BOOKING DETECTED! Private package - Keeping minimumPerson at ${currentMinimumPerson}`);
+                }
+            } else if (operation === "subtract" && newBookedCount === 0 && currentBookedCount > 0) {
+                // All bookings cancelled - restore original minimumPerson from package
+                const originalMinimumPerson = packageDoc.minimumPerson || 1;
+                newMinimumPerson = originalMinimumPerson;
+                console.log(`� ALL BOOKINGS CANCELLED! Restoring minimumPerson from ${currentMinimumPerson} to ${originalMinimumPerson}`);
+            }
 
-            return true
+            // STEP 6: Update the slot
+            timeSlot.slots[slotIndex].bookedCount = newBookedCount;
+            timeSlot.slots[slotIndex].minimumPerson = newMinimumPerson;
+            
+            // STEP 7: Save and verify
+            const savedTimeSlot = await timeSlot.save();
+            
+            console.log(`✅ AFTER UPDATE - BookedCount: ${newBookedCount}, MinimumPerson: ${newMinimumPerson}`);
+            
+            // STEP 8: Double-check by re-querying from database
+            const verifyTimeSlot = await TimeSlot.findOne({
+                packageType,
+                packageId,
+                date
+            });
+            if (verifyTimeSlot) {
+                const verifySlot = verifyTimeSlot.slots[slotIndex];
+                console.log(`🔍 DATABASE VERIFICATION - BookedCount: ${verifySlot.bookedCount}, MinimumPerson: ${verifySlot.minimumPerson}`);
+                
+                if (verifySlot.minimumPerson !== newMinimumPerson) {
+                    console.error(`❌ VERIFICATION FAILED! Expected minimumPerson=${newMinimumPerson}, got ${verifySlot.minimumPerson}`);
+                } else {
+                    console.log(`✅ VERIFICATION SUCCESS! MinimumPerson correctly set to ${verifySlot.minimumPerson}`);
+                }
+            } else {
+                console.log('⚠️ Database verification failed: TimeSlot not found');
+            }
+            
+            return true;
         } catch (error) {
             console.error("Error updating slot booking:", error)
             throw error
@@ -204,8 +320,22 @@ export class TimeSlotService {
         capacity: number
         bookedCount: number
         isAvailable: boolean
+        minimumPerson: number
+        currentMinimum: number // Effective minimum based on booking status
     }> | null> {
         try {
+            // Get package details to check if it's private
+            let packageDoc: any = null
+            if (packageType === "tour") {
+                packageDoc = await Tour.findById(packageId)
+            } else {
+                packageDoc = await Transfer.findById(packageId)
+            }
+
+            if (!packageDoc) {
+                return null
+            }
+
             const timeSlot = await TimeSlot.findOne({
                 packageType,
                 packageId,
@@ -216,21 +346,33 @@ export class TimeSlotService {
                 return null
             }
 
-            // Check if this date is a blackout date for this package type
-            const BlackoutDate = (await import("../models/BlackoutDate")).default
-            const isBlackoutDate = await BlackoutDate.findOne({
-                date: new Date(date + 'T00:00:00.000Z'),
-                packageType
+            const isPrivate = packageDoc.type === "private" || packageDoc.type === "Private"
+
+            const slotsWithAvailability = timeSlot.slots.map(slot => {
+                // Calculate effective currentMinimum based on booking status
+                // For non-private: minimumPerson is already correct (package min or 1 after first booking)
+                // For private: always use package minimum regardless of booking status
+                let currentMinimum = slot.minimumPerson;
+                
+                if (isPrivate) {
+                    // For private tours, always enforce the original package minimum
+                    currentMinimum = packageDoc.minimumPerson || slot.minimumPerson;
+                } else {
+                    // For non-private tours, use the slot's minimumPerson (which is already managed correctly)
+                    currentMinimum = slot.minimumPerson;
+                }
+                
+                console.log(`📋 Slot ${slot.time} - BookedCount: ${slot.bookedCount}, MinimumPerson: ${slot.minimumPerson}, CurrentMinimum: ${currentMinimum}, IsPrivate: ${isPrivate}`);
+                
+                return {
+                    time: slot.time,
+                    capacity: slot.capacity,
+                    bookedCount: slot.bookedCount,
+                    isAvailable: slot.isAvailable && this.isBookingAllowed(date, slot.time) && (slot.capacity - slot.bookedCount) > 0,
+                    minimumPerson: slot.minimumPerson,
+                    currentMinimum
+                }
             })
-
-            console.log(`Checking blackout for ${packageType} on ${date}:`, !!isBlackoutDate)
-
-            const slotsWithAvailability = timeSlot.slots.map(slot => ({
-                time: slot.time,
-                capacity: slot.capacity,
-                bookedCount: slot.bookedCount,
-                isAvailable: !isBlackoutDate && this.isBookingAllowed(date, slot.time) && (slot.capacity - slot.bookedCount) > 0
-            }))
 
             return slotsWithAvailability
         } catch (error) {
@@ -241,32 +383,52 @@ export class TimeSlotService {
 
 
     /**
-     * Check if booking is allowed (allow booking from the very next day)
+     * Check if booking is allowed (allow booking from the very next day with 10-hour cutoff)
      */
     private static isBookingAllowed(date: string, time: string): boolean {
         try {
-            // Parse the date and time in Malaysia timezone
+            // Parse the date and time
             const [year, month, day] = date.split('-').map(Number)
             const [timeStr, period] = time.split(' ')
             const [hours, minutes] = timeStr.split(':').map(Number)
-            
+
             let hour24 = hours
-            if (period === 'PM' && hours !== 12) {
+            if (period && period.toUpperCase() === 'PM' && hours !== 12) {
                 hour24 += 12
-            } else if (period === 'AM' && hours === 12) {
+            } else if (period && period.toUpperCase() === 'AM' && hours === 12) {
                 hour24 = 0
             }
 
-            // Create departure datetime in Malaysia timezone (UTC+8)
-            const departureTime = new Date(year, month - 1, day, hour24, minutes)
-            
-            // Get current time in Malaysia timezone
+            // Get current UTC time and add 8 hours for Malaysia time
             const now = new Date()
-            const malaysiaTime = new Date(now.getTime() + (8 * 60 * 60 * 1000)) // UTC+8
+            const malaysiaNow = new Date(now.getTime() + 8 * 60 * 60 * 1000)
 
-            // Allow booking if the departure time is in the future (even if less than 10 hours)
-            // This allows booking from the very next day
-            return departureTime.getTime() > malaysiaTime.getTime()
+            // Create departure time in Malaysia time (local Malaysia time)
+            const departureMYT = new Date(Date.UTC(year, month - 1, day, hour24, minutes))
+
+            // Check if booking date is at least tomorrow (Malaysia time)
+            const todayMYT = new Date(malaysiaNow.getFullYear(), malaysiaNow.getMonth(), malaysiaNow.getDate())
+            const tomorrowMYT = new Date(todayMYT.getTime() + 24 * 60 * 60 * 1000)
+            const bookingDateMYT = new Date(year, month - 1, day)
+
+            if (bookingDateMYT.getTime() < tomorrowMYT.getTime()) {
+                console.log(`Booking rejected - date ${date} is not at least tomorrow (MYT)`)
+                return false
+            }
+
+            // Calculate cutoff time (10 hours before departure, in Malaysia time)
+            const cutoffMYT = new Date(departureMYT.getTime() - 10 * 60 * 60 * 1000)
+
+            // Allow booking only if current Malaysia time is before the cutoff time
+            const isAllowed = malaysiaNow.getTime() < cutoffMYT.getTime()
+
+            console.log(`Booking time check:`)
+            console.log(`Current Malaysia Time: ${malaysiaNow.toISOString()}`)
+            console.log(`Departure Time (MYT): ${departureMYT.toISOString()}`)
+            console.log(`Cutoff Time (MYT): ${cutoffMYT.toISOString()}`)
+            console.log(`Booking Allowed: ${isAllowed}`)
+
+            return isAllowed
         } catch (error) {
             console.error("Error checking booking time:", error)
             return false
@@ -278,7 +440,8 @@ export class TimeSlotService {
      */
     private static formatDateToMYT(date: Date): string {
         // Convert to Malaysia timezone (UTC+8)
-        const malaysiaTime = new Date(date.getTime() + (8 * 60 * 60 * 1000))
+        const malaysiaOffset = 8 * 60 * 60 * 1000
+        const malaysiaTime = new Date(date.getTime() + malaysiaOffset)
         return malaysiaTime.toISOString().split('T')[0]
     }
 
@@ -287,15 +450,15 @@ export class TimeSlotService {
      */
     static getMalaysiaDateTime(): { date: string; time: string; fullDateTime: Date } {
         const now = new Date()
-        const malaysiaTime = new Date(now.getTime() + (8 * 60 * 60 * 1000))
+        const malaysiaOffset = 8 * 60 * 60 * 1000
+        const malaysiaTime = new Date(now.getTime() + malaysiaOffset)
         
         return {
             date: malaysiaTime.toISOString().split('T')[0],
             time: malaysiaTime.toLocaleTimeString('en-US', { 
-                hour12: true, 
-                hour: 'numeric', 
-                minute: '2-digit',
-                timeZone: 'Asia/Kuala_lumpur'
+                hour12: true,
+                hour: 'numeric',
+                minute: '2-digit'
             }),
             fullDateTime: malaysiaTime
         }
@@ -306,7 +469,8 @@ export class TimeSlotService {
      */
     static formatDateToMalaysiaTimezone(dateString: string): string {
         const date = new Date(dateString + 'T00:00:00.000Z')
-        const malaysiaTime = new Date(date.getTime() + (8 * 60 * 60 * 1000))
+        const malaysiaOffset = 8 * 60 * 60 * 1000
+        const malaysiaTime = new Date(date.getTime() + malaysiaOffset)
         return malaysiaTime.toISOString().split('T')[0]
     }
 
@@ -390,6 +554,22 @@ export class TimeSlotService {
             // Get today's date
             const today = new Date();
             const todayStr = today.toISOString().split('T')[0];
+            
+            // Get package details to retrieve minimumPerson
+            let packageDoc: any = null;
+            if (packageType === "tour") {
+                packageDoc = await Tour.findById(packageId);
+            } else {
+                packageDoc = await Transfer.findById(packageId);
+            }
+            
+            if (!packageDoc) {
+                throw new Error("Package not found");
+            }
+            
+            // Get the package's minimumPerson value
+            const packageMinimumPerson = packageDoc.minimumPerson || 1;
+            console.log(`Using package minimumPerson: ${packageMinimumPerson} for ${packageType} ${packageId}`);
 
             // Find all existing time slots for this package from today onwards
             const existingSlots = await TimeSlot.find({
@@ -404,11 +584,18 @@ export class TimeSlotService {
                     // Try to find existing slot data for this time
                     const existingSlot = slot.slots.find(s => s.time === time);
                     
+                    // For existing slots with bookings, keep their minimumPerson value
+                    // For slots with no bookings or new slots, use the package's minimumPerson
+                    const minimumPerson = existingSlot && existingSlot.bookedCount > 0 
+                        ? Math.min(existingSlot.minimumPerson, 1) // If it has bookings, it should be 1 
+                        : packageMinimumPerson; // Otherwise use package default
+                    
                     return {
                         time,
                         capacity: newCapacity,
                         bookedCount: existingSlot ? Math.min(existingSlot.bookedCount, newCapacity) : 0,
-                        isAvailable: true
+                        isAvailable: true,
+                        minimumPerson: minimumPerson // Use correct minimum person
                     };
                 });
 
@@ -423,7 +610,6 @@ export class TimeSlotService {
 
             for (let d = new Date(today); d <= endDate; d.setDate(d.getDate() + 1)) {
                 const dateStr = d.toISOString().split('T')[0];
-                
                 // Check if slot already exists for this date
                 const existingSlot = await TimeSlot.findOne({
                     packageType,
@@ -437,7 +623,8 @@ export class TimeSlotService {
                         time,
                         capacity: newCapacity,
                         bookedCount: 0,
-                        isAvailable: true
+                        isAvailable: true,
+                        minimumPerson: 1 // or fetch from package if available
                     }));
 
                     await TimeSlot.create({
@@ -453,6 +640,44 @@ export class TimeSlotService {
         } catch (error) {
             console.error("Error updating slots for package:", error);
             throw error;
+        }
+    }
+
+    /**
+     * Toggle availability of a specific slot
+     */
+    static async toggleSlotAvailability(
+        packageType: "tour" | "transfer",
+        packageId: Types.ObjectId,
+        date: string,
+        time: string,
+        isAvailable: boolean
+    ): Promise<boolean> {
+        try {
+            const timeSlot = await TimeSlot.findOne({
+                packageType,
+                packageId,
+                date
+            })
+
+            if (!timeSlot) {
+                throw new Error("Time slot not found")
+            }
+
+            const slotIndex = timeSlot.slots.findIndex(s => s.time === time)
+            if (slotIndex === -1) {
+                throw new Error("Specific time slot not found")
+            }
+
+            // Update the isAvailable property
+            timeSlot.slots[slotIndex].isAvailable = isAvailable
+            await timeSlot.save()
+
+            console.log(`Slot ${packageType}:${packageId} on ${date} at ${time} set to ${isAvailable ? 'available' : 'unavailable'}`)
+            return true
+        } catch (error) {
+            console.error("Error toggling slot availability:", error)
+            throw error
         }
     }
 }

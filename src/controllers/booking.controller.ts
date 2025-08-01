@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import BookingService from "../services/booking.service";
+import EmailService from "../services/email.service";
 import mongoose from "mongoose";
 
 class BookingController {
@@ -47,6 +48,28 @@ class BookingController {
           paymentStatus: "pending"
         }
       });
+
+      // Send confirmation email to customer
+      try {
+        await EmailService.sendBookingConfirmation({
+          customerName: contactInfo.name,
+          customerEmail: contactInfo.email,
+          bookingId: (booking as any)._id.toString(),
+          packageName: packageType === 'tour' ? 'Tour Package' : 'Transfer Service',
+          packageType,
+          date: new Date(date).toLocaleDateString(),
+          time,
+          adults,
+          children: children || 0,
+          pickupLocation,
+          total,
+          currency: paymentInfo?.currency || "MYR"
+        });
+        console.log(`Confirmation email sent to ${contactInfo.email}`);
+      } catch (emailError: any) {
+        console.error("Failed to send confirmation email:", emailError.message);
+        // Don't fail the booking creation if email fails
+      }
 
       res.status(201).json({
         success: true,

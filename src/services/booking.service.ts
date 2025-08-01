@@ -43,26 +43,9 @@ class BookingService {
         throw new Error("Package not found");
       }
 
-      // Check if this is the first booking for this package on this date
-      const existingBookings = await BookingModel.find({
-        packageId: data.packageId,
-        date: {
-          $gte: new Date(data.date.toISOString().split('T')[0]),
-          $lt: new Date(new Date(data.date.toISOString().split('T')[0]).getTime() + 24 * 60 * 60 * 1000)
-        },
-        status: { $in: ['pending', 'confirmed'] }
-      });
-
       const totalGuests = data.adults + data.children;
       
-      // Apply minimum person requirement only if this is the first booking
-      if (existingBookings.length === 0 && packageDetails.minimumPerson) {
-        if (totalGuests < packageDetails.minimumPerson) {
-          throw new Error(`Minimum ${packageDetails.minimumPerson} persons required for the first booking of this package`);
-        }
-      }
-
-      // Check slot availability using TimeSlotService
+      // Check slot availability using TimeSlotService (includes minimum person validation)
       const availability = await TimeSlotService.checkAvailability(
         data.packageType,
         data.packageId,

@@ -8,7 +8,8 @@ import {
     getSlotsSummary,
     deleteSlotsForPackage,
     debugTimeSlots,
-    getServerDateTime
+    getServerDateTime,
+    toggleSlotAvailability
 } from "../controllers/timeSlot.controller"
 
 const router = Router()
@@ -21,6 +22,9 @@ router.get("/availability", checkAvailability)
 
 // Get available slots for a specific date
 router.get("/available", getAvailableSlots)
+
+// Toggle slot availability (enable/disable specific time slot)
+router.put("/toggle-availability", toggleSlotAvailability)
 
 // Get server's Malaysia timezone date and time
 router.get("/server-datetime", getServerDateTime)

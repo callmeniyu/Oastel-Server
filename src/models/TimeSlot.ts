@@ -6,6 +6,7 @@ export interface Slot {
   capacity: number
   bookedCount: number
   isAvailable: boolean
+  minimumPerson: number 
   cutoffTime?: Date
   price?: number
 }
@@ -33,6 +34,7 @@ const TimeSlotSchema = new Schema<TimeSlotType>(
         capacity: Number,
         bookedCount: { type: Number, default: 0 },
         isAvailable: { type: Boolean, default: true },
+        minimumPerson: { type: Number }, // No default, will be set from package data
         cutoffTime: { type: Date }, // For 10-hour cutoff rule
         price: { type: Number }, // Dynamic pricing per slot
       },
