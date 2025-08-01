@@ -1,3 +1,4 @@
+import './config/env'; // Load environment variables first
 import app from './app';
 import connectDB from './config/db';
 

@@ -25,6 +25,14 @@ export class EmailService {
    */
   async sendBookingConfirmation(booking: BookingEmailData): Promise<boolean> {
     try {
+      // Validate required environment variables
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.error('❌ Missing required email environment variables:');
+        console.error('SMTP_USER:', process.env.SMTP_USER ? '✓ Set' : '✗ Missing');
+        console.error('SMTP_PASS:', process.env.SMTP_PASS ? '✓ Set' : '✗ Missing');
+        throw new Error('Missing SMTP credentials in environment variables');
+      }
+
       // Debug: Log configuration (without password)
       console.log('📧 Email Configuration Check:');
       console.log('SMTP Host:', emailConfig.smtp.host);
