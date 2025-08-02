@@ -1,51 +1,30 @@
-import { Request, Response } from "express";
-import cartService from "../services/cart.service";
-import mongoose from "mongoose";
+import { Request, Response } from 'express';
+import { cartService } from '../services/cart.service';
 
-class CartController {
-  // Helper method to get user ObjectId from either ObjectId or email
-  private async getUserObjectId(userIdentifier: string): Promise<string> {
-    if (!userIdentifier || typeof userIdentifier !== "string" || userIdentifier.trim() === "") {
-      throw new Error("Invalid user identifier provided");
-    }
-    
-    // If it's already a valid ObjectId, return it
-    if (mongoose.Types.ObjectId.isValid(userIdentifier)) {
-      return userIdentifier;
-    }
-    
-    // Otherwise, assume it's an email and look up the user
+export class CartController {
+  // Get cart for user
+  async getCart(req: Request, res: Response) {
     try {
-      const UserModel = mongoose.model('User');
-      const user = await UserModel.findOne({ email: userIdentifier }).select('_id');
-      if (!user) {
-        throw new Error(`User not found for email: ${userIdentifier}`);
+      const { userEmail } = req.params;
+      
+      if (!userEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'User email is required'
+        });
       }
-      
-      return (user._id as mongoose.Types.ObjectId).toString();
-    } catch (error: any) {
-      console.error("Error finding user:", error);
-      throw new Error(`Failed to find user with email: ${userIdentifier}`);
-    }
-  }
 
-  // Get cart by user ID
-  async getCartByUserId(req: Request, res: Response) {
-    try {
-      const { userId } = req.params;
-      
-      const userObjectId = await this.getUserObjectId(userId);
-      const cart = await cartService.getCartByUserId(userObjectId);
+      const cart = await cartService.getCartWithDetails(userEmail);
       
       res.json({
         success: true,
         data: cart
       });
     } catch (error: any) {
-      console.error("Error getting cart:", error);
+      console.error('Error getting cart:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        message: error.message || 'Failed to get cart'
       });
     }
   }
@@ -53,53 +32,78 @@ class CartController {
   // Add item to cart
   async addToCart(req: Request, res: Response) {
     try {
-      console.log("📦 Received cart data:", req.body);
-      
-      const { userId, packageType, packageId, date, time, adults, children, pickupLocation } = req.body;
-      
-      if (!userId || !packageType || !packageId || !date || !time || !adults) {
-        console.error("Missing required fields:", { userId: !!userId, packageType: !!packageType, packageId: !!packageId, date: !!date, time: !!time, adults: !!adults });
-        return res.status(400).json({
-          success: false,
-          error: "Missing required fields"
-        });
-      }
-
-      if (!mongoose.Types.ObjectId.isValid(packageId)) {
-        console.error("Invalid package ID:", packageId);
-        return res.status(400).json({
-          success: false,
-          error: "Invalid package ID"
-        });
-      }
-
-      console.log("🔍 Getting user ObjectId for:", userId);
-      const userObjectId = await this.getUserObjectId(userId);
-      console.log("✅ User ObjectId:", userObjectId);
-
-      const cartItem = {
+      const {
+        userEmail,
+        packageId,
         packageType,
-        packageId: new mongoose.Types.ObjectId(packageId),
-        date,
-        time,
+        selectedDate,
+        selectedTime,
+        adults,
+        children,
+        pickupLocation
+      } = req.body;
+
+      // Validation
+      if (!userEmail || !packageId || !packageType || !selectedDate || !selectedTime || !adults) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing required fields'
+        });
+      }
+
+      if (!['tour', 'transfer'].includes(packageType)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid package type'
+        });
+      }
+
+      if (adults < 1 || adults > 20) {
+        return res.status(400).json({
+          success: false,
+          message: 'Adults count must be between 1 and 20'
+        });
+      }
+
+      if (children < 0 || children > 10) {
+        return res.status(400).json({
+          success: false,
+          message: 'Children count must be between 0 and 10'
+        });
+      }
+
+      // Check if selected date is not in the past
+      const selectedDateObj = new Date(selectedDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (selectedDateObj < today) {
+        return res.status(400).json({
+          success: false,
+          message: 'Selected date cannot be in the past'
+        });
+      }
+
+      const cart = await cartService.addToCart(userEmail, {
+        packageId,
+        packageType,
+        selectedDate,
+        selectedTime,
         adults,
         children: children || 0,
-        pickupLocation: pickupLocation || ""
-      };
+        pickupLocation: pickupLocation || ''
+      });
 
-      console.log("🛒 Adding cart item:", cartItem);
-      const cart = await cartService.addToCart(userObjectId, cartItem);
-      console.log("✅ Cart updated successfully");
-      
       res.status(201).json({
         success: true,
+        message: 'Item added to cart successfully',
         data: cart
       });
     } catch (error: any) {
-      console.error("❌ Error adding to cart:", error);
-      res.status(400).json({
+      console.error('Error adding to cart:', error);
+      res.status(500).json({
         success: false,
-        error: error.message
+        message: error.message || 'Failed to add item to cart'
       });
     }
   }
@@ -107,21 +111,56 @@ class CartController {
   // Update cart item
   async updateCartItem(req: Request, res: Response) {
     try {
-      const { userId, itemIndex } = req.params;
+      const { userEmail, itemId } = req.params;
       const updates = req.body;
-      
-      const userObjectId = await this.getUserObjectId(userId);
-      const cart = await cartService.updateCartItem(userObjectId, parseInt(itemIndex), updates);
-      
+
+      if (!userEmail || !itemId) {
+        return res.status(400).json({
+          success: false,
+          message: 'User email and item ID are required'
+        });
+      }
+
+      // Validate updates
+      if (updates.adults !== undefined && (updates.adults < 1 || updates.adults > 20)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Adults count must be between 1 and 20'
+        });
+      }
+
+      if (updates.children !== undefined && (updates.children < 0 || updates.children > 10)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Children count must be between 0 and 10'
+        });
+      }
+
+      if (updates.selectedDate) {
+        const selectedDateObj = new Date(updates.selectedDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (selectedDateObj < today) {
+          return res.status(400).json({
+            success: false,
+            message: 'Selected date cannot be in the past'
+          });
+        }
+      }
+
+      const cart = await cartService.updateCartItem(userEmail, itemId, updates);
+
       res.json({
         success: true,
+        message: 'Cart item updated successfully',
         data: cart
       });
     } catch (error: any) {
-      console.error("Error updating cart item:", error);
-      res.status(400).json({
+      console.error('Error updating cart item:', error);
+      res.status(500).json({
         success: false,
-        error: error.message
+        message: error.message || 'Failed to update cart item'
       });
     }
   }
@@ -129,20 +168,27 @@ class CartController {
   // Remove item from cart
   async removeFromCart(req: Request, res: Response) {
     try {
-      const { userId, itemIndex } = req.params;
-      
-      const userObjectId = await this.getUserObjectId(userId);
-      const cart = await cartService.removeFromCart(userObjectId, parseInt(itemIndex));
-      
+      const { userEmail, itemId } = req.params;
+
+      if (!userEmail || !itemId) {
+        return res.status(400).json({
+          success: false,
+          message: 'User email and item ID are required'
+        });
+      }
+
+      const cart = await cartService.removeFromCart(userEmail, itemId);
+
       res.json({
         success: true,
+        message: 'Item removed from cart successfully',
         data: cart
       });
     } catch (error: any) {
-      console.error("Error removing from cart:", error);
-      res.status(400).json({
+      console.error('Error removing from cart:', error);
+      res.status(500).json({
         success: false,
-        error: error.message
+        message: error.message || 'Failed to remove item from cart'
       });
     }
   }
@@ -150,20 +196,54 @@ class CartController {
   // Clear entire cart
   async clearCart(req: Request, res: Response) {
     try {
-      const { userId } = req.params;
-      
-      const userObjectId = await this.getUserObjectId(userId);
-      const cart = await cartService.clearCart(userObjectId);
-      
+      const { userEmail } = req.params;
+
+      if (!userEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'User email is required'
+        });
+      }
+
+      const cart = await cartService.clearCart(userEmail);
+
       res.json({
         success: true,
+        message: 'Cart cleared successfully',
         data: cart
       });
     } catch (error: any) {
-      console.error("Error clearing cart:", error);
-      res.status(400).json({
+      console.error('Error clearing cart:', error);
+      res.status(500).json({
         success: false,
-        error: error.message
+        message: error.message || 'Failed to clear cart'
+      });
+    }
+  }
+
+  // Get cart item count
+  async getCartItemCount(req: Request, res: Response) {
+    try {
+      const { userEmail } = req.params;
+
+      if (!userEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'User email is required'
+        });
+      }
+
+      const count = await cartService.getCartItemCount(userEmail);
+
+      res.json({
+        success: true,
+        data: { count }
+      });
+    } catch (error: any) {
+      console.error('Error getting cart item count:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to get cart item count'
       });
     }
   }

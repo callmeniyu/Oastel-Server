@@ -1,38 +1,42 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface ICartItem extends Document {
-  userId: string;
-  packageType: 'tour' | 'transfer';
+// Interface for cart item
+export interface ICartItem {
+  _id?: mongoose.Types.ObjectId;
   packageId: mongoose.Types.ObjectId;
+  packageType: 'tour' | 'transfer';
   packageTitle: string;
-  packageImage?: string;
-  date: Date;
-  time: string;
+  packageImage: string;
+  packagePrice: number;
+  selectedDate: Date;
+  selectedTime: string;
   adults: number;
   children: number;
-  adultPrice: number;
-  childPrice: number;
-  totalPrice: number;
   pickupLocation?: string;
+  totalPrice: number;
+  addedAt: Date;
+}
+
+// Interface for cart document
+export interface ICart extends Document {
+  userId: mongoose.Types.ObjectId;
+  items: ICartItem[];
+  totalAmount: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
+// Cart item subdocument schema
 const CartItemSchema = new Schema<ICartItem>({
-  userId: {
-    type: String,
+  packageId: {
+    type: Schema.Types.ObjectId,
     required: true,
-    index: true
+    refPath: 'packageType'
   },
   packageType: {
     type: String,
     enum: ['tour', 'transfer'],
     required: true
-  },
-  packageId: {
-    type: Schema.Types.ObjectId,
-    required: true,
-    refPath: 'packageType'
   },
   packageTitle: {
     type: String,
@@ -40,51 +44,123 @@ const CartItemSchema = new Schema<ICartItem>({
   },
   packageImage: {
     type: String,
-    default: ''
+    required: true
   },
-  date: {
+  packagePrice: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  selectedDate: {
     type: Date,
     required: true
   },
-  time: {
+  selectedTime: {
     type: String,
     required: true
   },
   adults: {
     type: Number,
     required: true,
-    min: 1
+    min: 1,
+    max: 20
   },
   children: {
     type: Number,
     default: 0,
-    min: 0
+    min: 0,
+    max: 10
   },
-  adultPrice: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  childPrice: {
-    type: Number,
-    default: 0,
-    min: 0
+  pickupLocation: {
+    type: String,
+    default: ''
   },
   totalPrice: {
     type: Number,
     required: true,
     min: 0
   },
-  pickupLocation: {
-    type: String,
-    default: ''
+  addedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, { _id: true });
+
+// Main cart schema
+const CartSchema = new Schema<ICart>({
+  userId: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    unique: true
+  },
+  items: [CartItemSchema],
+  totalAmount: {
+    type: Number,
+    default: 0,
+    min: 0
   }
 }, {
   timestamps: true
 });
 
-// Index for efficient queries
-CartItemSchema.index({ userId: 1, createdAt: -1 });
-CartItemSchema.index({ userId: 1, packageId: 1, date: 1, time: 1 }, { unique: true });
+// Indexes for performance
+CartSchema.index({ userId: 1 });
+CartSchema.index({ 'items.packageId': 1 });
+CartSchema.index({ createdAt: -1 });
 
-export default mongoose.model<ICartItem>('CartItem', CartItemSchema);
+// Pre-save middleware to calculate total amount
+CartSchema.pre('save', function() {
+  this.totalAmount = this.items.reduce((total, item) => total + item.totalPrice, 0);
+});
+
+// Instance methods
+CartSchema.methods.addItem = function(item: ICartItem) {
+  // Check if item already exists (same package, date, time)
+  const existingItemIndex = this.items.findIndex((cartItem: ICartItem) => 
+    cartItem.packageId.toString() === item.packageId.toString() &&
+    cartItem.selectedDate.toDateString() === item.selectedDate.toDateString() &&
+    cartItem.selectedTime === item.selectedTime
+  );
+
+  if (existingItemIndex > -1) {
+    // Update existing item
+    this.items[existingItemIndex] = item;
+  } else {
+    // Add new item
+    this.items.push(item);
+  }
+  
+  return this.save();
+};
+
+CartSchema.methods.removeItem = function(itemId: string) {
+  this.items.id(itemId).deleteOne();
+  return this.save();
+};
+
+CartSchema.methods.updateItem = function(itemId: string, updates: Partial<ICartItem>) {
+  const item = this.items.id(itemId);
+  if (item) {
+    Object.assign(item, updates);
+    // Recalculate total price for the item
+    if (updates.adults !== undefined || updates.children !== undefined || updates.packagePrice !== undefined) {
+      const adults = updates.adults !== undefined ? updates.adults : item.adults;
+      const children = updates.children !== undefined ? updates.children : item.children;
+      const price = updates.packagePrice !== undefined ? updates.packagePrice : item.packagePrice;
+      item.totalPrice = (adults + children) * price;
+    }
+  }
+  return this.save();
+};
+
+CartSchema.methods.clearCart = function() {
+  this.items = [];
+  return this.save();
+};
+
+CartSchema.methods.getItemCount = function() {
+  return this.items.length;
+};
+
+export default mongoose.model<ICart>('Cart', CartSchema);
