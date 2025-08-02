@@ -89,6 +89,23 @@ class BookingService {
         "add"
       );
 
+      // Update package bookedCount
+      if (data.packageType === 'tour') {
+        const TourModel = mongoose.model('Tour');
+        await TourModel.findByIdAndUpdate(
+          data.packageId,
+          { $inc: { bookedCount: totalGuests } }
+        );
+        console.log(`✅ Updated Tour bookedCount by ${totalGuests} for package ${data.packageId}`);
+      } else if (data.packageType === 'transfer') {
+        const TransferModel = mongoose.model('Transfer');
+        await TransferModel.findByIdAndUpdate(
+          data.packageId,
+          { $inc: { bookedCount: totalGuests } }
+        );
+        console.log(`✅ Updated Transfer bookedCount by ${totalGuests} for package ${data.packageId}`);
+      }
+
       return savedBooking;
     } catch (error) {
       console.error("Error creating booking:", error);
@@ -171,6 +188,59 @@ class BookingService {
     );
 
     return populatedBookings;
+  }
+
+  // Get bookings with full package details
+  async getBookingsWithDetails(filter: any): Promise<any[]> {
+    const query: any = {};
+    
+    // Copy all filter properties to query
+    Object.assign(query, filter);
+
+    // Get bookings first
+    const bookings = await BookingModel.find(query)
+      .sort({ createdAt: -1 })
+      .exec();
+
+    // Manually populate packageId for each booking and format for frontend
+    const bookingsWithDetails = await Promise.all(
+      bookings.map(async (booking) => {
+        let packageDetails = null;
+        
+        if (booking.packageType === 'tour') {
+          const TourModel = mongoose.model('Tour');
+          packageDetails = await TourModel.findById(booking.packageId).select('title image price duration slug');
+        } else if (booking.packageType === 'transfer') {
+          const TransferModel = mongoose.model('Transfer');
+          packageDetails = await TransferModel.findById(booking.packageId).select('title image price duration vehicle slug');
+        }
+
+        return {
+          _id: booking._id,
+          packageType: booking.packageType,
+          packageId: booking.packageId,
+          date: booking.date,
+          time: booking.time,
+          adults: booking.adults,
+          children: booking.children,
+          pickupLocation: booking.pickupLocation,
+          total: booking.total,
+          status: booking.status,
+          createdAt: booking.createdAt,
+          contactInfo: booking.contactInfo,
+          packageDetails: packageDetails ? {
+            title: packageDetails.title,
+            image: packageDetails.image,
+            price: packageDetails.price,
+            duration: packageDetails.duration,
+            slug: packageDetails.slug,
+            vehicle: packageDetails.vehicle // for transfers
+          } : null
+        };
+      })
+    );
+
+    return bookingsWithDetails;
   }
 
   // Get booking by ID

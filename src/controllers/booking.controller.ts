@@ -133,6 +133,37 @@ class BookingController {
     }
   }
 
+  // Get bookings by user email
+  async getBookingsByUser(req: Request, res: Response) {
+    try {
+      const { email } = req.params;
+      
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          error: "Email parameter is required"
+        });
+      }
+
+      const filter = {
+        'contactInfo.email': email
+      };
+
+      const bookings = await BookingService.getBookingsWithDetails(filter);
+      
+      res.json({
+        success: true,
+        data: bookings
+      });
+    } catch (error: any) {
+      console.error("Error fetching user bookings:", error);
+      res.status(400).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  }
+
   // Get booking by ID
   async getBookingById(req: Request, res: Response) {
     try {

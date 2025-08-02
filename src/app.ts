@@ -10,6 +10,8 @@ import blackoutDateRoutes from "./routes/blackoutDate.routes"
 import blogRoutes from "./routes/blog.routes"
 import uploadRoutes from "./routes/upload.routes"
 import timeSlotRoutes from "./routes/timeSlot.routes"
+import cartRoutes from "./routes/cart.routes"
+import userRoutes from "./routes/user.routes"
 
 const app = express()
 
@@ -28,6 +30,8 @@ app.use("/api/blackout-dates", blackoutDateRoutes)
 app.use("/api/blogs", blogRoutes)
 app.use("/api/upload", uploadRoutes)
 app.use("/api/timeslots", timeSlotRoutes)
+app.use("/api/cart", cartRoutes)
+app.use("/api/users", userRoutes)
 
 
 export default app

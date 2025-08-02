@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import cartService from "../services/cart.service";
 import mongoose from "mongoose";
-import User from "../models/User";
 
 class CartController {
   // Helper method to get user ObjectId from either ObjectId or email
@@ -9,21 +8,25 @@ class CartController {
     if (!userIdentifier || typeof userIdentifier !== "string" || userIdentifier.trim() === "") {
       throw new Error("Invalid user identifier provided");
     }
+    
     // If it's already a valid ObjectId, return it
     if (mongoose.Types.ObjectId.isValid(userIdentifier)) {
       return userIdentifier;
     }
     
     // Otherwise, assume it's an email and look up the user
-    if (!User || typeof User.findOne !== "function") {
-      throw new Error("User model is not defined or not imported correctly");
+    try {
+      const UserModel = mongoose.model('User');
+      const user = await UserModel.findOne({ email: userIdentifier }).select('_id');
+      if (!user) {
+        throw new Error(`User not found for email: ${userIdentifier}`);
+      }
+      
+      return (user._id as mongoose.Types.ObjectId).toString();
+    } catch (error: any) {
+      console.error("Error finding user:", error);
+      throw new Error(`Failed to find user with email: ${userIdentifier}`);
     }
-    const user = await User.findOne({ email: userIdentifier }).select('_id');
-    if (!user) {
-      throw new Error(`User not found for email: ${userIdentifier}`);
-    }
-    
-    return (user._id as mongoose.Types.ObjectId).toString();
   }
 
   // Get cart by user ID
@@ -50,9 +53,12 @@ class CartController {
   // Add item to cart
   async addToCart(req: Request, res: Response) {
     try {
-      const { userId, packageType, packageId, date, time, adults, children } = req.body;
+      console.log("📦 Received cart data:", req.body);
+      
+      const { userId, packageType, packageId, date, time, adults, children, pickupLocation } = req.body;
       
       if (!userId || !packageType || !packageId || !date || !time || !adults) {
+        console.error("Missing required fields:", { userId: !!userId, packageType: !!packageType, packageId: !!packageId, date: !!date, time: !!time, adults: !!adults });
         return res.status(400).json({
           success: false,
           error: "Missing required fields"
@@ -60,13 +66,16 @@ class CartController {
       }
 
       if (!mongoose.Types.ObjectId.isValid(packageId)) {
+        console.error("Invalid package ID:", packageId);
         return res.status(400).json({
           success: false,
           error: "Invalid package ID"
         });
       }
 
+      console.log("🔍 Getting user ObjectId for:", userId);
       const userObjectId = await this.getUserObjectId(userId);
+      console.log("✅ User ObjectId:", userObjectId);
 
       const cartItem = {
         packageType,
@@ -74,17 +83,20 @@ class CartController {
         date,
         time,
         adults,
-        children: children || 0
+        children: children || 0,
+        pickupLocation: pickupLocation || ""
       };
 
+      console.log("🛒 Adding cart item:", cartItem);
       const cart = await cartService.addToCart(userObjectId, cartItem);
+      console.log("✅ Cart updated successfully");
       
       res.status(201).json({
         success: true,
         data: cart
       });
     } catch (error: any) {
-      console.error("Error adding to cart:", error);
+      console.error("❌ Error adding to cart:", error);
       res.status(400).json({
         success: false,
         error: error.message

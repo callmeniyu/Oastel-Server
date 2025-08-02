@@ -36,6 +36,9 @@ class CartService {
           // Update existing item
           cart.items[existingItemIndex].adults = item.adults;
           cart.items[existingItemIndex].children = item.children;
+          if (item.pickupLocation !== undefined) {
+            cart.items[existingItemIndex].pickupLocation = item.pickupLocation;
+          }
         } else {
           // Add new item
           cart.items.push(item);
