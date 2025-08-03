@@ -55,6 +55,7 @@ class BookingController {
           customerName: contactInfo.name,
           customerEmail: contactInfo.email,
           bookingId: (booking as any)._id.toString(),
+          packageId: packageId, // Added required property
           packageName: packageType === 'tour' ? 'Tour Package' : 'Transfer Service',
           packageType,
           date: new Date(date).toLocaleDateString(),
