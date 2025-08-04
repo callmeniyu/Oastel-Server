@@ -127,6 +127,14 @@ export class EmailService {
             .info-box h3 { font-family: 'Poppins', sans-serif; color: #8c7a00; margin-bottom: 10px; font-weight: 600; }
             .info-box ul { color: #8c7a00; padding-left: 20px; line-height: 1.8; font-family: 'Poppins', sans-serif; }
             .email-text { font-family: 'Poppins', sans-serif; }
+            .icon { width: 16px; height: 16px; display: inline-block; margin-right: 8px; vertical-align: text-top; }
+            .success-icon { color: #22c55e; }
+            .calendar-icon { color: #3b82f6; }
+            .clock-icon { color: #8b5cf6; }
+            .location-icon { color: #ef4444; }
+            .users-icon { color: #f59e0b; }
+            .price-icon { color: #10b981; }
+            .info-icon { color: #0ea5e9; }
             @media (max-width: 600px) {
                 .container { border-radius: 0; }
                 .content { padding: 20px 10px; }
@@ -144,7 +152,12 @@ export class EmailService {
             <div class="header">
                 <div class="header-content">
                     <div class="text-logo">Oastel</div>
-                    <h1>🎉 Booking Confirmed!</h1>
+                    <h1>
+                        <svg class="icon success-icon" style="width: 24px; height: 24px; margin-right: 8px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        Booking Confirmed!
+                    </h1>
                     <p>Your adventure awaits</p>
                 </div>
             </div>
@@ -152,14 +165,20 @@ export class EmailService {
             <!-- Content -->
             <div class="content">
                 <div class="greeting">
-                    Hello ${booking.customerName}! 👋
+                    <svg class="icon users-icon" style="width: 18px; height: 18px; margin-right: 8px;" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                    </svg>
+                    Hello ${booking.customerName}!
                 </div>
 
                 <p class="email-text">Thank you for choosing ${emailConfig.from.name}! We're excited to confirm your booking for an amazing experience.</p>
 
                 <div class="confirmation-box">
                     <h2 style="color: #0C7157; margin-bottom: 15px; font-size: 20px; font-family: 'Poppins', sans-serif; font-weight: 600;">
-                        ✅ ${booking.packageName}
+                        <svg class="icon success-icon" style="width: 20px; height: 20px; margin-right: 8px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        ${booking.packageName}
                     </h2>
                     <p style="color: #444; font-size: 14px; font-family: 'Poppins', sans-serif;">
                         Booking ID: <strong>#${booking.bookingId.slice(-8).toUpperCase()}</strong>
@@ -168,57 +187,112 @@ export class EmailService {
 
                 <div class="booking-details">
                     <div class="detail-row">
-                        <span class="detail-label">📅 Date:</span>
+                        <span class="detail-label">
+                            <svg class="icon calendar-icon" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
+                            </svg>
+                            Date:
+                        </span>
                         <span class="detail-value">${formatDate(booking.date)}</span>
                     </div>
                     <div class="detail-row">
-                        <span class="detail-label">🕐 Time:</span>
+                        <span class="detail-label">
+                            <svg class="icon clock-icon" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                            </svg>
+                            Time:
+                        </span>
                         <span class="detail-value">${booking.time}</span>
                     </div>
                     ${booking.packageType === 'transfer' && booking.from && booking.to ? `
                     <div class="detail-row">
-                        <span class="detail-label">🚗 From:</span>
+                        <span class="detail-label">
+                            <svg class="icon location-icon" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+                            </svg>
+                            From:
+                        </span>
                         <span class="detail-value">${booking.from}</span>
                     </div>
                     <div class="detail-row">
-                        <span class="detail-label">🎯 To:</span>
+                        <span class="detail-label">
+                            <svg class="icon location-icon" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+                            </svg>
+                            To:
+                        </span>
                         <span class="detail-value">${booking.to}</span>
                     </div>
                     ` : ''}
                     <div class="detail-row">
-                        <span class="detail-label">👥 Adults:</span>
+                        <span class="detail-label">
+                            <svg class="icon users-icon" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                            </svg>
+                            Adults:
+                        </span>
                         <span class="detail-value">${booking.adults}</span>
                     </div>
                     ${booking.children > 0 ? `
                     <div class="detail-row">
-                        <span class="detail-label">👶 Children:</span>
+                        <span class="detail-label">
+                            <svg class="icon users-icon" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                            </svg>
+                            Children:
+                        </span>
                         <span class="detail-value">${booking.children}</span>
                     </div>
                     ` : ''}
                     <div class="detail-row">
-                        <span class="detail-label">🎯 Type:</span>
+                        <span class="detail-label">
+                            <svg class="icon info-icon" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                            </svg>
+                            Type:
+                        </span>
                         <span class="detail-value">${booking.packageType === 'tour' ? 'Tour Package' : 'Transfer Service'}</span>
                     </div>
                     ${booking.pickupLocation ? `
                     <div class="detail-row">
-                        <span class="detail-label">📍 Pickup:</span>
+                        <span class="detail-label">
+                            <svg class="icon location-icon" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+                            </svg>
+                            Pickup:
+                        </span>
                         <span class="detail-value">${booking.pickupLocation}</span>
                     </div>
                     ` : ''}
                     <div class="detail-row total-row">
-                        <span class="detail-label">💰 Total Amount:</span>
+                        <span class="detail-label">
+                            <svg class="icon price-icon" style="width: 20px; height: 20px; margin-right: 8px;" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
+                            </svg>
+                            Total Amount:
+                        </span>
                         <span class="detail-value">${booking.currency} ${booking.total.toFixed(2)}</span>
                     </div>
                 </div>
 
                 <div style="text-align: center; margin: 36px 0;">
-                    <a href="${tourDetailsUrl}" class="cta-button">
-                        🎫 View My Bookings
+                    <a href="${tourDetailsUrl}" class="detail-value">
+                        <svg class="icon" style="width: 18px; height: 18px; margin-right: 8px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                        </svg>
+                        View ${booking.packageType === 'tour' ? 'Tour' : 'Transfer'}
                     </a>
                 </div>
 
                 <div class="info-box">
-                    <h3>📋 Important Information:</h3>
+                    <h3>
+                        <svg class="icon info-icon" style="width: 18px; height: 18px; margin-right: 8px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                        </svg>
+                        Important Information:
+                    </h3>
                     <ul>
                         <li>Please arrive 15 minutes before your scheduled time</li>
                         <li>Bring a valid ID and this confirmation email</li>
@@ -232,7 +306,10 @@ export class EmailService {
                 </p>
 
                 <p class="email-text" style="margin-top: 20px; color: #0C7157; font-weight: 600;">
-                    Safe travels and see you soon! 🌟
+                    Safe travels and see you soon!
+                    <svg class="icon" style="width: 16px; height: 16px; margin-left: 8px;" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
+                    </svg>
                 </p>
             </div>
 
@@ -241,9 +318,25 @@ export class EmailService {
                 <p><strong>${emailConfig.from.name}</strong></p>
                 <p>Your trusted travel partner</p>
                 <div class="social-links">
-                    <a href="mailto:${emailConfig.templates.supportEmail}">✉️ Email</a>
-                    <a href="tel:${emailConfig.templates.supportPhone}">📞 Call</a>
-                    <a href="${emailConfig.templates.website}">🌐 Website</a>
+                    <a href="mailto:${emailConfig.templates.supportEmail}">
+                        <svg class="icon" style="width: 16px; height: 16px; margin-right: 4px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
+                            <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
+                        </svg>
+                        Email
+                    </a>
+                    <a href="tel:${emailConfig.templates.supportPhone}">
+                        <svg class="icon" style="width: 16px; height: 16px; margin-right: 4px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
+                        </svg>
+                        Call
+                    </a>
+                    <a href="${emailConfig.templates.website}">
+                        <svg class="icon" style="width: 16px; height: 16px; margin-right: 4px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4.083 9h1.946c.089-1.546.383-2.97.837-4.118A6.004 6.004 0 004.083 9zM10 2a8 8 0 100 16 8 8 0 000-16zm0 2c-.076 0-.232.032-.465.262-.238.234-.497.623-.737 1.182-.389.907-.673 2.142-.766 3.556h3.936c-.093-1.414-.377-2.649-.766-3.556-.24-.56-.5-.948-.737-1.182C10.232 4.032 10.076 4 10 4zm3.971 5c-.089-1.546-.383-2.97-.837-4.118A6.004 6.004 0 0115.917 9h-1.946zm-2.003 2H8.032c.093 1.414.377 2.649.766 3.556.24.56.5.948.737 1.182.233.23.389.262.465.262.076 0 .232-.032.465-.262.238-.234.498-.623.737-1.182.389-.907.673-2.142.766-3.556zm1.166 4.118c.454-1.147.748-2.572.837-4.118h1.946a6.004 6.004 0 01-2.783 4.118zm-6.268 0C6.412 13.97 6.118 12.546 6.03 11H4.083a6.004 6.004 0 002.783 4.118z" clip-rule="evenodd"/>
+                        </svg>
+                        Website
+                    </a>
                 </div>
                 <p style="font-size: 12px; color: #bbb; margin-top: 20px; font-family: 'Poppins', sans-serif;">
                     This email was sent to ${booking.customerEmail}<br>
