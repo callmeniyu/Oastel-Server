@@ -9,6 +9,9 @@ export interface BookingEmailData {
   packageId: string;
   packageName: string;
   packageType: 'tour' | 'transfer';
+  // Transfer-specific details
+  from?: string;
+  to?: string;
   date: string;
   time: string;
   adults: number;
@@ -172,6 +175,16 @@ export class EmailService {
                         <span class="detail-label">🕐 Time:</span>
                         <span class="detail-value">${booking.time}</span>
                     </div>
+                    ${booking.packageType === 'transfer' && booking.from && booking.to ? `
+                    <div class="detail-row">
+                        <span class="detail-label">🚗 From:</span>
+                        <span class="detail-value">${booking.from}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">🎯 To:</span>
+                        <span class="detail-value">${booking.to}</span>
+                    </div>
+                    ` : ''}
                     <div class="detail-row">
                         <span class="detail-label">👥 Adults:</span>
                         <span class="detail-value">${booking.adults}</span>

@@ -389,22 +389,37 @@ export class TimeSlotService {
         try {
             // Parse the date and time
             const [year, month, day] = date.split('-').map(Number)
-            const [timeStr, period] = time.split(' ')
-            const [hours, minutes] = timeStr.split(':').map(Number)
-
-            let hour24 = hours
-            if (period && period.toUpperCase() === 'PM' && hours !== 12) {
-                hour24 += 12
-            } else if (period && period.toUpperCase() === 'AM' && hours === 12) {
-                hour24 = 0
+            
+            // Parse time - handle both 12-hour and 24-hour formats
+            let hour24: number;
+            let minutes: number;
+            
+            if (time.includes('AM') || time.includes('PM')) {
+                // 12-hour format
+                const [timeStr, period] = time.split(' ')
+                const [hours, mins] = timeStr.split(':').map(Number)
+                hour24 = hours
+                minutes = mins
+                
+                if (period && period.toUpperCase() === 'PM' && hours !== 12) {
+                    hour24 += 12
+                } else if (period && period.toUpperCase() === 'AM' && hours === 12) {
+                    hour24 = 0
+                }
+            } else {
+                // 24-hour format (e.g., "08:00", "14:00")
+                const [hours, mins] = time.split(':').map(Number)
+                hour24 = hours
+                minutes = mins
             }
 
-            // Get current UTC time and add 8 hours for Malaysia time
+            // Get current UTC time and convert to Malaysia time
             const now = new Date()
             const malaysiaNow = new Date(now.getTime() + 8 * 60 * 60 * 1000)
 
-            // Create departure time in Malaysia time (local Malaysia time)
-            const departureMYT = new Date(Date.UTC(year, month - 1, day, hour24, minutes))
+            // Create departure time in Malaysia timezone
+            // Note: We need to create this as a proper Malaysia time
+            const departureMYT = new Date(year, month - 1, day, hour24, minutes)
 
             // Check if booking date is at least tomorrow (Malaysia time)
             const todayMYT = new Date(malaysiaNow.getFullYear(), malaysiaNow.getMonth(), malaysiaNow.getDate())
@@ -422,10 +437,10 @@ export class TimeSlotService {
             // Allow booking only if current Malaysia time is before the cutoff time
             const isAllowed = malaysiaNow.getTime() < cutoffMYT.getTime()
 
-            console.log(`Booking time check:`)
-            console.log(`Current Malaysia Time: ${malaysiaNow.toISOString()}`)
-            console.log(`Departure Time (MYT): ${departureMYT.toISOString()}`)
-            console.log(`Cutoff Time (MYT): ${cutoffMYT.toISOString()}`)
+            console.log(`Booking time check for ${date} ${time}:`)
+            console.log(`Current Malaysia Time: ${malaysiaNow.toISOString()} (${malaysiaNow.toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })})`)
+            console.log(`Departure Time (MYT): ${departureMYT.toISOString()} (${departureMYT.toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })})`)
+            console.log(`Cutoff Time (MYT): ${cutoffMYT.toISOString()} (${cutoffMYT.toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })})`)
             console.log(`Booking Allowed: ${isAllowed}`)
 
             return isAllowed

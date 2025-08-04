@@ -49,14 +49,26 @@ class BookingController {
         }
       });
 
+      // Get package details for email
+      let packageDetails: any = null;
+      if (packageType === 'tour') {
+        const mongoose = require('mongoose');
+        const TourModel = mongoose.model('Tour');
+        packageDetails = await TourModel.findById(packageId);
+      } else if (packageType === 'transfer') {
+        const mongoose = require('mongoose');
+        const TransferModel = mongoose.model('Transfer');
+        packageDetails = await TransferModel.findById(packageId);
+      }
+
       // Send confirmation email to customer
       try {
-        await EmailService.sendBookingConfirmation({
+        const emailData = {
           customerName: contactInfo.name,
           customerEmail: contactInfo.email,
           bookingId: (booking as any)._id.toString(),
-          packageId: packageId, // Added required property
-          packageName: packageType === 'tour' ? 'Tour Package' : 'Transfer Service',
+          packageId: packageId,
+          packageName: packageDetails?.title || (packageType === 'tour' ? 'Tour Package' : 'Transfer Service'),
           packageType,
           date: new Date(date).toLocaleDateString(),
           time,
@@ -65,7 +77,15 @@ class BookingController {
           pickupLocation,
           total,
           currency: paymentInfo?.currency || "MYR"
-        });
+        };
+
+        // Add transfer-specific details
+        if (packageType === 'transfer' && packageDetails) {
+          (emailData as any).from = packageDetails.from;
+          (emailData as any).to = packageDetails.to;
+        }
+
+        await EmailService.sendBookingConfirmation(emailData);
         console.log(`Confirmation email sent to ${contactInfo.email}`);
       } catch (emailError: any) {
         console.error("Failed to send confirmation email:", emailError.message);
