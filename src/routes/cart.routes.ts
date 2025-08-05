@@ -1,24 +1,27 @@
-import { Router } from 'express';
+import express from 'express';
 import cartController from '../controllers/cart.controller';
 
-const router = Router();
+const router = express.Router();
 
-// Get cart for user
-router.get('/:userEmail', cartController.getCart);
+// Get user's cart
+router.get('/:userEmail', cartController.getCart.bind(cartController));
 
 // Add item to cart
-router.post('/', cartController.addToCart);
+router.post('/', cartController.addToCart.bind(cartController));
 
 // Update cart item
-router.put('/:userEmail/items/:itemId', cartController.updateCartItem);
+router.put('/:userEmail/items/:itemId', cartController.updateCartItem.bind(cartController));
 
 // Remove item from cart
-router.delete('/:userEmail/items/:itemId', cartController.removeFromCart);
+router.delete('/:userEmail/items/:itemId', cartController.removeFromCart.bind(cartController));
 
 // Clear entire cart
-router.delete('/:userEmail', cartController.clearCart);
+router.delete('/:userEmail', cartController.clearCart.bind(cartController));
 
 // Get cart item count
-router.get('/:userEmail/count', cartController.getCartItemCount);
+router.get('/:userEmail/count', cartController.getCartItemCount.bind(cartController));
+
+// Get cart summary
+router.get('/:userEmail/summary', cartController.getCartSummary.bind(cartController));
 
 export default router;

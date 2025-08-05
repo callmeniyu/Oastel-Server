@@ -11,6 +11,7 @@ import blogRoutes from "./routes/blog.routes"
 import uploadRoutes from "./routes/upload.routes"
 import timeSlotRoutes from "./routes/timeSlot.routes"
 import cartRoutes from "./routes/cart.routes"
+import cartBookingRoutes from "./routes/cartBooking.routes"
 import userRoutes from "./routes/user.routes"
 
 const app = express()
@@ -31,6 +32,7 @@ app.use("/api/blogs", blogRoutes)
 app.use("/api/upload", uploadRoutes)
 app.use("/api/timeslots", timeSlotRoutes)
 app.use("/api/cart", cartRoutes)
+app.use("/api/cart-booking", cartBookingRoutes)
 app.use("/api/users", userRoutes)
 
 

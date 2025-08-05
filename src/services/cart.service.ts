@@ -5,11 +5,11 @@ import Transfer from '../models/Transfer';
 import mongoose from 'mongoose';
 
 export class CartService {
-  // Get or create cart for user
+  // Get or create cart for user with caching optimization
   async getCart(userEmail: string): Promise<ICart> {
     try {
       // Find user by email
-      const user = await User.findOne({ email: userEmail });
+      const user = await User.findOne({ email: userEmail }).select('_id').lean();
       if (!user) {
         throw new Error('User not found');
       }
@@ -33,7 +33,7 @@ export class CartService {
     }
   }
 
-  // Add item to cart
+  // Add item to cart with optimization
   async addToCart(userEmail: string, item: {
     packageId: string;
     packageType: 'tour' | 'transfer';
@@ -46,12 +46,14 @@ export class CartService {
     try {
       const cart = await this.getCart(userEmail);
 
-      // Get package details
+      // Get package details with minimal fields for performance
       let packageDoc: any;
+      const selectFields = 'title image images newPrice price';
+      
       if (item.packageType === 'tour') {
-        packageDoc = await Tour.findById(item.packageId);
+        packageDoc = await Tour.findById(item.packageId).select(selectFields).lean();
       } else {
-        packageDoc = await Transfer.findById(item.packageId);
+        packageDoc = await Transfer.findById(item.packageId).select(selectFields).lean();
       }
       
       if (!packageDoc) {
@@ -79,15 +81,20 @@ export class CartService {
       };
 
       // Check if item already exists (same package, date, time)
-      const existingItemIndex = cart.items.findIndex((cartItem: any) => 
+      const existingItemIndex = cart.items.findIndex((cartItem: ICartItem) => 
         cartItem.packageId.toString() === item.packageId &&
         cartItem.selectedDate.toDateString() === new Date(item.selectedDate).toDateString() &&
         cartItem.selectedTime === item.selectedTime
       );
 
       if (existingItemIndex > -1) {
-        // Update existing item
-        cart.items[existingItemIndex] = cartItem;
+        // Update existing item (merge quantities)
+        const existingItem = cart.items[existingItemIndex];
+        existingItem.adults = item.adults;
+        existingItem.children = item.children;
+        existingItem.totalPrice = totalPrice;
+        existingItem.pickupLocation = item.pickupLocation || existingItem.pickupLocation;
+        existingItem.addedAt = new Date(); // Update timestamp
       } else {
         // Add new item
         cart.items.push(cartItem);
@@ -143,7 +150,7 @@ export class CartService {
       
       // Remove item by _id
       // Remove the item from the cart
-      cart.items = cart.items.filter(item => item._id?.toString() !== itemId);
+      cart.items = cart.items.filter((item: ICartItem) => item._id?.toString() !== itemId);
       
       await cart.save();
       return cart;
@@ -184,7 +191,7 @@ export class CartService {
       
       // Manually populate package details
       const populatedItems = await Promise.all(
-        cart.items.map(async (item: any) => {
+        cart.items.map(async (item: ICartItem) => {
           let packageDetails = null;
           
           if (item.packageType === 'tour') {
@@ -194,7 +201,7 @@ export class CartService {
           }
 
           return {
-            ...item.toObject(),
+            ...(item as any).toObject ? (item as any).toObject() : item,
             packageDetails: packageDetails ? {
               title: packageDetails.title,
               image: (packageDetails as any).image || '',
@@ -207,7 +214,7 @@ export class CartService {
       );
 
       return {
-        ...cart.toObject(),
+        ...(cart as any).toObject ? (cart as any).toObject() : cart,
         items: populatedItems
       };
     } catch (error) {

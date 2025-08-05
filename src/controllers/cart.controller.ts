@@ -29,6 +29,29 @@ export class CartController {
     }
   }
 
+  // Get cart summary (item count and total amount)
+  async getCartSummary(req: Request, res: Response) {
+    try {
+      const { userEmail } = req.params;
+      if (!userEmail) {
+        return res.status(400).json({ success: false, message: 'User email is required' });
+      }
+      const cart = await cartService.getCartWithDetails(userEmail);
+      if (!cart) {
+        return res.status(404).json({ success: false, message: 'Cart not found' });
+      }
+      res.json({
+        success: true,
+        data: {
+          itemCount: cart.items.length,
+          totalAmount: cart.totalAmount
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message || 'Failed to get cart summary' });
+    }
+  }
+
   // Add item to cart
   async addToCart(req: Request, res: Response) {
     try {
