@@ -417,11 +417,9 @@ export class TimeSlotService {
             const now = new Date()
             const malaysiaNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}))
 
-            // Create departure time in Malaysia timezone
-            // Use the parsed date components to create a proper Malaysia time
-            const departureMYT = new Date()
-            departureMYT.setFullYear(year, month - 1, day)
-            departureMYT.setHours(hour24, minutes, 0, 0)
+            // Create departure time by parsing the date and time in Malaysia context
+            // Since we're dealing with Malaysia bookings, treat the input date/time as Malaysia time
+            const departureMYT = new Date(year, month - 1, day, hour24, minutes, 0, 0)
 
             // Check if booking date is at least tomorrow (Malaysia time)
             const todayMYT = new Date(malaysiaNow.getFullYear(), malaysiaNow.getMonth(), malaysiaNow.getDate())
@@ -433,16 +431,17 @@ export class TimeSlotService {
                 return false
             }
 
-            // Calculate cutoff time (10 hours before departure, in Malaysia time)
+            // Calculate cutoff time (10 hours before departure)
             const cutoffMYT = new Date(departureMYT.getTime() - 10 * 60 * 60 * 1000)
 
             // Allow booking only if current Malaysia time is before the cutoff time
             const isAllowed = malaysiaNow.getTime() < cutoffMYT.getTime()
 
             console.log(`Booking time check for ${date} ${time}:`)
-            console.log(`Current Malaysia Time: ${malaysiaNow.toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })}`)
-            console.log(`Departure Time (MYT): ${departureMYT.toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })}`)
-            console.log(`Cutoff Time (MYT): ${cutoffMYT.toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })}`)
+            console.log(`Current Malaysia Time: ${malaysiaNow.toISOString()} (${malaysiaNow.toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })})`)
+            console.log(`Departure Time: ${departureMYT.toISOString()} (${departureMYT.toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })})`) 
+            console.log(`Cutoff Time: ${cutoffMYT.toISOString()} (${cutoffMYT.toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })})`)
+            console.log(`Time difference (hours): ${(departureMYT.getTime() - malaysiaNow.getTime()) / (1000 * 60 * 60)}`)
             console.log(`Booking Allowed: ${isAllowed}`)
 
             return isAllowed
