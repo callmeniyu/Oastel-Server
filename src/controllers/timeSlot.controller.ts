@@ -121,6 +121,9 @@ export const checkAvailability = async (req: Request, res: Response) => {
 }
 
 /**
+ * Check availability for cart items (no time restrictions)
+ */
+/**
  * Get available slots for a specific date
  */
 export const getAvailableSlots = async (req: Request, res: Response) => {

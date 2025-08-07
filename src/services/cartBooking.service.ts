@@ -37,17 +37,23 @@ export class CartBookingService {
       };
 
       // Get user and cart
+      console.log('Cart booking: Looking for user with email:', request.userEmail);
       const user = await User.findOne({ email: request.userEmail }).session(session);
       if (!user) {
-        result.errors.push('User not found');
+        console.log('Cart booking: User not found in database');
+        result.errors.push(`User not found: ${request.userEmail}`);
         return result;
       }
+      console.log('Cart booking: Found user:', user._id, user.name || 'No name');
 
+      console.log('Cart booking: Looking for cart for user:', user._id);
       const cart = await Cart.findOne({ userId: user._id }).session(session);
       if (!cart || cart.items.length === 0) {
-        result.errors.push('Cart is empty');
+        console.log('Cart booking: Cart not found or empty');
+        result.errors.push('Cart is empty or not found');
         return result;
       }
+      console.log('Cart booking: Found cart with', cart.items.length, 'items');
 
       const currentDate = new Date();
       currentDate.setHours(0, 0, 0, 0); // Reset time for date comparison
