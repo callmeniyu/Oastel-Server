@@ -32,13 +32,15 @@ export class CartBookingController {
       const result = await cartBookingService.bookCartItems(request);
 
       if (result.success) {
+        const confirmationPath = `/booking/cart-confirmation?ids=${encodeURIComponent(result.bookings.join(','))}`;
         res.status(200).json({
           success: true,
           message: `Successfully created ${result.bookings.length} booking(s)`,
           data: {
             bookingIds: result.bookings,
             warnings: result.warnings,
-            totalBookings: result.bookings.length
+            totalBookings: result.bookings.length,
+            confirmationPath
           }
         });
       } else {

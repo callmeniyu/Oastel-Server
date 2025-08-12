@@ -4,6 +4,7 @@ import User from '../models/User';
 import Tour from '../models/Tour';
 import Transfer from '../models/Transfer';
 import { EmailService } from './email.service';
+import { TimeSlotService } from './timeSlot.service';
 import mongoose from 'mongoose';
 
 export interface CartBookingRequest {
@@ -129,11 +130,11 @@ export class CartBookingService {
             userId: user._id,
             packageType: item.packageType,
             packageId: item.packageId,
-            date: new Date(item.selectedDate), // Keep as-is since it's already a Date object from MongoDB
+            date: new Date(new Date(item.selectedDate).toISOString().split('T')[0] + 'T12:00:00.000Z'),
             time: item.selectedTime,
             adults: Number(item.adults) || 1, // Ensure it's a number
             children: Number(item.children) || 0, // Ensure it's a number with default
-            pickupLocation: String(item.pickupLocation || ''), // Use actual pickup location, empty string if not specified
+            pickupLocation: String(item.pickupLocation && item.pickupLocation.trim() ? item.pickupLocation : 'Not specified'), // Preserve actual pickup location
             status: 'pending',
             firstBookingMinimum: false,
             contactInfo: {
@@ -167,6 +168,45 @@ export class CartBookingService {
           const savedBooking = await booking.save({ session });
           console.log(`✅ Successfully saved booking ${savedBooking._id} for ${item.packageTitle}`);
           result.bookings.push(savedBooking._id.toString());
+
+          // Update slot booking count using TimeSlotService
+          const totalGuests = item.adults + item.children;
+          try {
+            await TimeSlotService.updateSlotBooking(
+              item.packageType,
+              item.packageId,
+              new Date(item.selectedDate).toISOString().split('T')[0],
+              item.selectedTime,
+              totalGuests,
+              "add"
+            );
+            console.log(`✅ Updated slot booking count by ${totalGuests} for ${item.packageTitle}`);
+          } catch (slotError: any) {
+            console.error(`⚠️ Failed to update slot booking count for ${item.packageTitle}:`, slotError.message);
+            result.warnings.push(`Slot booking count could not be updated for ${item.packageTitle}`);
+          }
+
+          // Update package bookedCount
+          try {
+            if (item.packageType === 'tour') {
+              await Tour.findByIdAndUpdate(
+                item.packageId,
+                { $inc: { bookedCount: totalGuests } },
+                { session }
+              );
+              console.log(`✅ Updated Tour bookedCount by ${totalGuests} for package ${item.packageId}`);
+            } else if (item.packageType === 'transfer') {
+              await Transfer.findByIdAndUpdate(
+                item.packageId,
+                { $inc: { bookedCount: totalGuests } },
+                { session }
+              );
+              console.log(`✅ Updated Transfer bookedCount by ${totalGuests} for package ${item.packageId}`);
+            }
+          } catch (countError: any) {
+            console.error(`⚠️ Failed to update package bookedCount for ${item.packageTitle}:`, countError.message);
+            result.warnings.push(`Package booking count could not be updated for ${item.packageTitle}`);
+          }
 
           // Send confirmation email for this booking
           try {

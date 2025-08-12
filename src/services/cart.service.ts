@@ -71,7 +71,7 @@ export class CartService {
         packageTitle: packageDoc.title,
         packageImage: packageDoc.images?.[0] || packageDoc.image || '',
         packagePrice: packagePrice,
-        selectedDate: new Date(item.selectedDate + 'T00:00:00.000Z'), // Force UTC interpretation to avoid timezone issues
+        selectedDate: new Date(item.selectedDate + 'T12:00:00.000Z'), // Use noon UTC to avoid timezone shifts
         selectedTime: item.selectedTime,
         adults: item.adults,
         children: item.children,
@@ -83,7 +83,7 @@ export class CartService {
       // Check if item already exists (same package, date, time)
       const existingItemIndex = cart.items.findIndex((cartItem: ICartItem) => 
         cartItem.packageId.toString() === item.packageId &&
-        cartItem.selectedDate.toDateString() === new Date(item.selectedDate + 'T00:00:00.000Z').toDateString() &&
+        cartItem.selectedDate.toDateString() === new Date(item.selectedDate + 'T12:00:00.000Z').toDateString() &&
         cartItem.selectedTime === item.selectedTime
       );
 
@@ -128,7 +128,7 @@ export class CartService {
       // Update fields
       if (updates.adults !== undefined) item.adults = updates.adults;
       if (updates.children !== undefined) item.children = updates.children;
-      if (updates.selectedDate) item.selectedDate = new Date(updates.selectedDate);
+      if (updates.selectedDate) item.selectedDate = new Date(updates.selectedDate + 'T12:00:00.000Z');
       if (updates.selectedTime) item.selectedTime = updates.selectedTime;
       if (updates.pickupLocation !== undefined) item.pickupLocation = updates.pickupLocation;
 
