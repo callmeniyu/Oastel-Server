@@ -96,7 +96,7 @@ export class CartController {
       }
 
       // Check if selected date is not in the past
-      const selectedDateObj = new Date(selectedDate);
+      const selectedDateObj = new Date(selectedDate + 'T00:00:00.000Z'); // Force UTC to avoid timezone issues
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       

@@ -13,7 +13,7 @@ async function debugCartBooking() {
     console.log('1. Testing cart-booking endpoint existence...');
     try {
       // Send a deliberately invalid request to see if endpoint exists
-      const response = await axios.post('http://192.168.163.50:3002/api/cart-booking', {});
+      const response = await axios.post('http://localhost:3002/api/cart-booking', {});
     } catch (error) {
       if (error.response) {
         console.log(`✅ Endpoint exists - Status: ${error.response.status}`);
@@ -27,7 +27,7 @@ async function debugCartBooking() {
     // Test 2: Check server logs or available routes
     console.log('\n2. Testing server health...');
     try {
-      const healthResponse = await axios.get('http://192.168.163.50:3002/api/timeslots/server-datetime');
+      const healthResponse = await axios.get('http://localhost:3002/api/timeslots/server-datetime');
       if (healthResponse.data.success) {
         console.log('✅ Server is running and responsive');
       }
@@ -39,7 +39,7 @@ async function debugCartBooking() {
     // Test 3: Try to find any user by checking tours (users might be embedded in bookings)
     console.log('\n3. Checking for available data...');
     try {
-      const toursResponse = await axios.get('http://192.168.163.50:3002/api/tours?limit=1');
+      const toursResponse = await axios.get('http://localhost:3002/api/tours?limit=1');
       if (toursResponse.data.success) {
         console.log('✅ Tours API working');
         
@@ -65,7 +65,7 @@ async function debugCartBooking() {
 
         try {
           const bookingResponse = await axios.post(
-            'http://192.168.163.50:3002/api/cart-booking',
+            'http://localhost:3002/api/cart-booking',
             bookingRequest,
             {
               headers: {

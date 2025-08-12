@@ -1,10 +1,11 @@
 const mongoose = require('mongoose');
+const fetch = require('node-fetch');
 require('dotenv').config();
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/oastel');
 
-// Define User Schema (client version for compatibility)
+// Define User Schema
 const UserSchema = new mongoose.Schema({
   name: String,
   email: String,
@@ -22,7 +23,7 @@ const UserSchema = new mongoose.Schema({
   googleId: String,
 }, { timestamps: true });
 
-// Define Cart Schema (server version for compatibility)
+// Define Cart Schema (server version)
 const CartItemSchema = new mongoose.Schema({
   packageId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -84,15 +85,15 @@ const CartSchema = new mongoose.Schema({
 const User = mongoose.model('User', UserSchema);
 const Cart = mongoose.model('Cart', CartSchema);
 
-async function createTestData() {
+async function setupTestDataAndTest() {
   try {
-    console.log('=== CREATING TEST DATA ===');
+    console.log('=== COMPREHENSIVE CART BOOKING TEST ===');
     
-    // Create a test user
+    // Step 1: Create test user
     const testUser = {
       name: 'Test User',
       email: 'test@example.com',
-      passwordHash: '$2a$10$hash', // Mock hash
+      passwordHash: '$2a$10$hash',
       image: '',
       location: 'Kuala Lumpur',
       bio: 'Test user for cart booking',
@@ -105,19 +106,18 @@ async function createTestData() {
       provider: 'credentials',
     };
 
-    // Check if user already exists
     let existingUser = await User.findOne({ email: testUser.email });
-    if (existingUser) {
-      console.log('✅ Test user already exists:', existingUser.email);
-    } else {
+    if (!existingUser) {
       existingUser = await User.create(testUser);
       console.log('✅ Created test user:', existingUser.email);
+    } else {
+      console.log('✅ Test user already exists:', existingUser.email);
     }
 
-    // Create a test cart with proper server Cart model structure
+    // Step 2: Create test cart with proper server structure
     const testCartItems = [
       {
-        packageId: new mongoose.Types.ObjectId('507f1f77bcf86cd799439011'), // Mock tour ID
+        packageId: new mongoose.Types.ObjectId('507f1f77bcf86cd799439011'),
         packageType: 'tour',
         packageTitle: 'Intimate Group Adventure',
         packageImage: '/images/tour-sample.jpg',
@@ -129,32 +129,15 @@ async function createTestData() {
         pickupLocation: 'KLCC',
         totalPrice: 200,
         addedAt: new Date()
-      },
-      {
-        packageId: new mongoose.Types.ObjectId('507f1f77bcf86cd799439012'), // Mock transfer ID
-        packageType: 'transfer',
-        packageTitle: 'Airport Transfer Service',
-        packageImage: '/images/transfer-sample.jpg',
-        packagePrice: 75,
-        selectedDate: new Date(Date.now() + 48 * 60 * 60 * 1000), // Day after tomorrow
-        selectedTime: '14:00',
-        adults: 2,
-        children: 0,
-        pickupLocation: 'KL Sentral',
-        totalPrice: 150,
-        addedAt: new Date()
-      },
+      }
     ];
 
-    // Check if cart already exists
     let existingCart = await Cart.findOne({ userId: existingUser._id });
     if (existingCart) {
-      console.log('✅ Test cart already exists with', existingCart.items.length, 'items');
-      // Update cart items to ensure fresh data
       existingCart.items = testCartItems;
       existingCart.totalAmount = testCartItems.reduce((sum, item) => sum + item.totalPrice, 0);
       await existingCart.save();
-      console.log('✅ Updated cart with fresh test items');
+      console.log('✅ Updated test cart');
     } else {
       const totalAmount = testCartItems.reduce((sum, item) => sum + item.totalPrice, 0);
       existingCart = await Cart.create({
@@ -162,45 +145,82 @@ async function createTestData() {
         items: testCartItems,
         totalAmount: totalAmount,
       });
-      console.log('✅ Created test cart with', existingCart.items.length, 'items');
+      console.log('✅ Created test cart');
     }
 
-    console.log('\n📋 Test Data Summary:');
-    console.log(`User ID: ${existingUser._id}`);
-    console.log(`User Email: ${existingUser.email}`);
-    console.log(`Cart ID: ${existingCart._id}`);
-    console.log(`Cart Items: ${existingCart.items.length}`);
-    
-    existingCart.items.forEach((item, index) => {
-      console.log(`  Item ${index + 1}: ${item.packageType} - ${item.packageTitle} - ${item.selectedDate}`);
-    });
+    console.log(`📋 Test data ready - User: ${existingUser.email}, Cart items: ${existingCart.items.length}`);
 
-    console.log('\n🔧 Test Cart Booking Lookup:');
+    // Step 3: Test the cart booking API
+    console.log('\n🧪 Testing cart booking API...');
     
-    // Test the exact lookup that cart booking service uses
-    const userLookup = await User.findOne({ email: existingUser.email });
-    console.log(`User found by email: ${userLookup ? 'YES' : 'NO'}`);
-    
-    if (userLookup) {
-      const cartLookup = await Cart.findOne({ userId: userLookup._id });
-      console.log(`Cart found by userId: ${cartLookup ? 'YES' : 'NO'}`);
-      
-      if (cartLookup) {
-        console.log(`Cart has ${cartLookup.items.length} items`);
-        console.log('✅ Cart booking should work now!');
+    const bookingRequest = {
+      userEmail: existingUser.email,
+      contactInfo: {
+        name: 'Test User',
+        email: 'test@example.com',
+        phone: '+60123456789',
+        whatsapp: '+60123456789'
+      }
+    };
+
+    console.log('Request payload:', JSON.stringify(bookingRequest, null, 2));
+
+    // Wait a moment for database operations to complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    try {
+      const response = await fetch('http://localhost:5000/api/cart-booking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bookingRequest)
+      });
+
+      console.log('Response status:', response.status);
+
+      const responseText = await response.text();
+      console.log('Response body:', responseText);
+
+      if (response.ok) {
+        console.log('✅ Cart booking API test PASSED!');
+        try {
+          const jsonResponse = JSON.parse(responseText);
+          console.log('Parsed response:', JSON.stringify(jsonResponse, null, 2));
+        } catch (e) {
+          console.log('Response is not JSON');
+        }
+      } else {
+        console.log('❌ Cart booking API test FAILED');
+        try {
+          const errorResponse = JSON.parse(responseText);
+          console.log('Error details:', JSON.stringify(errorResponse, null, 2));
+          
+          if (errorResponse.errors) {
+            console.log('\n🔍 Error Analysis:');
+            errorResponse.errors.forEach(error => {
+              console.log(`- ${error}`);
+            });
+          }
+        } catch (e) {
+          console.log('Error response is not JSON');
+        }
+      }
+
+    } catch (fetchError) {
+      if (fetchError.code === 'ECONNREFUSED') {
+        console.log('❌ Server is not running on localhost:5000');
+        console.log('💡 Please start the server first: npm run dev');
+      } else {
+        console.error('❌ Fetch error:', fetchError.message);
       }
     }
 
-    console.log('\n🎯 Next Steps:');
-    console.log('1. Login with email: test@example.com');
-    console.log('2. Go to cart page - should show 2 items');
-    console.log('3. Proceed to booking - should work without "User not found" error');
-
   } catch (error) {
-    console.error('Error creating test data:', error);
+    console.error('❌ Test setup failed:', error);
   } finally {
     mongoose.connection.close();
   }
 }
 
-createTestData();
+setupTestDataAndTest();

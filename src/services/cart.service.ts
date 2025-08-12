@@ -71,7 +71,7 @@ export class CartService {
         packageTitle: packageDoc.title,
         packageImage: packageDoc.images?.[0] || packageDoc.image || '',
         packagePrice: packagePrice,
-        selectedDate: new Date(item.selectedDate),
+        selectedDate: new Date(item.selectedDate + 'T00:00:00.000Z'), // Force UTC interpretation to avoid timezone issues
         selectedTime: item.selectedTime,
         adults: item.adults,
         children: item.children,
@@ -83,7 +83,7 @@ export class CartService {
       // Check if item already exists (same package, date, time)
       const existingItemIndex = cart.items.findIndex((cartItem: ICartItem) => 
         cartItem.packageId.toString() === item.packageId &&
-        cartItem.selectedDate.toDateString() === new Date(item.selectedDate).toDateString() &&
+        cartItem.selectedDate.toDateString() === new Date(item.selectedDate + 'T00:00:00.000Z').toDateString() &&
         cartItem.selectedTime === item.selectedTime
       );
 
