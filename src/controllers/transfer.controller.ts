@@ -46,7 +46,20 @@ export const createTransfer = async (req: Request, res: Response) => {
         }
         // Normalize empty strings to undefined so mongoose doesn't store empty values
         if (transferData.vehicle === "") {
+            console.log('createTransfer - vehicle was empty string, deleting it')
             delete transferData.vehicle
+        } else if (transferData.vehicle) {
+            console.log('createTransfer - vehicle field present:', transferData.vehicle)
+        } else {
+            console.log('createTransfer - vehicle field missing or undefined')
+        }
+
+        // Validate that Private transfers have a vehicle
+        if (transferData.type === "Private" && (!transferData.vehicle || transferData.vehicle.trim() === "")) {
+            return res.status(400).json({
+                success: false,
+                message: "Vehicle name is required for Private transfers",
+            })
         }
 
         const transfer = new Transfer(transferData)
@@ -246,6 +259,14 @@ export const updateTransfer = async (req: Request, res: Response) => {
             } else {
                 delete transferData.vehicle
             }
+        }
+
+        // Validate that Private transfers have a vehicle
+        if (transferData.type === "Private" && (!transferData.vehicle || transferData.vehicle.trim() === "")) {
+            return res.status(400).json({
+                success: false,
+                message: "Vehicle name is required for Private transfers",
+            })
         }
 
         // Handle label - convert "None" to null

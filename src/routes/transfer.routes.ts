@@ -9,6 +9,7 @@ import {
     deleteTransfer,
     checkSlugAvailability,
     getVehicles,
+    getLastTransfer,
 } from "../controllers/transfer.controller"
 
 const router = Router()
