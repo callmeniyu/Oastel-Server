@@ -35,6 +35,8 @@ export interface Booking extends Document {
   subtotal: number;
   total: number;
   isAdminBooking?: boolean;
+  reviewEmailSent?: boolean;
+  reviewEmailSentAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -79,6 +81,8 @@ const BookingSchema: Schema = new Schema(
     subtotal: { type: Number, required: true },
     total: { type: Number, required: true },
     isAdminBooking: { type: Boolean, default: false },
+    reviewEmailSent: { type: Boolean, default: false },
+    reviewEmailSentAt: { type: Date },
   },
   { timestamps: true }
 );
@@ -90,5 +94,6 @@ BookingSchema.index({ slotId: 1 });
 BookingSchema.index({ status: 1, date: 1 });
 BookingSchema.index({ 'paymentInfo.paymentStatus': 1 });
 BookingSchema.index({ createdAt: -1 });
+BookingSchema.index({ reviewEmailSent: 1, date: 1 }); // For review email scheduler
 
 export default mongoose.models.Booking || mongoose.model<Booking>("Booking", BookingSchema);

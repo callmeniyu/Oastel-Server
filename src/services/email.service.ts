@@ -42,6 +42,17 @@ export interface CartBookingEmailData {
   currency: string;
 }
 
+export interface ReviewEmailData {
+  customerName: string;
+  customerEmail: string;
+  bookingId: string;
+  packageName: string;
+  packageType: 'tour' | 'transfer';
+  date: string;
+  time: string;
+  reviewFormUrl: string;
+}
+
 export class EmailService {
   private static transporter = nodemailer.createTransport(emailConfig.smtp);
 
@@ -120,6 +131,39 @@ export class EmailService {
       return true;
     } catch (error) {
       console.error('Error sending cart confirmation email:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Send review request email 12 hours after departure
+   */
+  async sendReviewRequest(reviewData: ReviewEmailData): Promise<boolean> {
+    try {
+      // Validate required environment variables
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.error('❌ Missing required email environment variables for review email');
+        throw new Error('Missing SMTP credentials in environment variables');
+      }
+
+      // Test connection first
+      await EmailService.transporter.verify();
+      console.log('✅ SMTP connection verified successfully for review email');
+
+      const html = this.generateReviewRequestHTML(reviewData);
+      
+      const mailOptions = {
+        from: `"${emailConfig.from.name}" <${emailConfig.from.email}>`,
+        to: reviewData.customerEmail,
+        subject: `🌟 Thank you for choosing us! Share your experience`,
+        html,
+      };
+
+      await EmailService.transporter.sendMail(mailOptions);
+      console.log(`Review request email sent to ${reviewData.customerEmail} for booking ${reviewData.bookingId}`);
+      return true;
+    } catch (error) {
+      console.error('Error sending review request email:', error);
       return false;
     }
   }
@@ -702,6 +746,322 @@ export class EmailService {
                 </div>
                 <p style="font-size: 12px; color: #bbb; margin-top: 20px; font-family: 'Poppins', sans-serif;">
                     This email was sent to ${cartData.customerEmail}<br>
+                    © ${new Date().getFullYear()} ${emailConfig.from.name}. All rights reserved.
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+  }
+
+  /**
+   * Generate review request email HTML template
+   */
+  generateReviewRequestHTML(reviewData: ReviewEmailData): string {
+    const formatDate = (dateString: string) => {
+      try {
+        if (!dateString) return "Invalid Date";
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return "Invalid Date";
+        return date.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+      } catch {
+        return "Invalid Date";
+      }
+    };
+
+    const formatTime = (timeString: string) => {
+      try {
+        if (!timeString) return "Invalid Time";
+        const [hours, minutes] = timeString.split(':');
+        if (!hours || !minutes) return timeString;
+        const date = new Date();
+        date.setHours(parseInt(hours), parseInt(minutes));
+        if (isNaN(date.getTime())) return timeString;
+        return date.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+      } catch {
+        return timeString;
+      }
+    };
+
+    const logoUrl = emailConfig.templates.logo;
+    const baseUrl = emailConfig.templates.website;
+
+    return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Share Your Experience</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: 'Poppins', Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                background-color: #f4f4f4;
+            }
+            .container {
+                max-width: 600px;
+                margin: 20px auto;
+                background-color: #ffffff;
+                border-radius: 10px;
+                overflow: hidden;
+                box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            }
+            .header {
+                background: linear-gradient(135deg, #0C7157 0%, #0C7157 100%);
+                color: white;
+                text-align: center;
+                padding: 40px 20px;
+            }
+            .logo {
+                width: 120px;
+                height: auto;
+                margin-bottom: 20px;
+            }
+            .company-name {
+                font-size: 28px;
+                font-weight: 700;
+                margin: 10px 0;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            }
+            .tagline {
+                font-size: 16px;
+                opacity: 0.9;
+                font-weight: 300;
+            }
+            .content {
+                padding: 40px 30px;
+            }
+            .greeting {
+                font-size: 24px;
+                color: #0C7157;
+                margin-bottom: 20px;
+                font-weight: 600;
+            }
+            .message {
+                font-size: 16px;
+                margin-bottom: 30px;
+                line-height: 1.8;
+                color: #555;
+            }
+            .booking-summary {
+                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                border-left: 4px solid #0C7157;
+                padding: 20px;
+                margin: 30px 0;
+                border-radius: 8px;
+            }
+            .booking-summary h3 {
+                color: #0C7157;
+                margin-bottom: 15px;
+                font-size: 18px;
+                font-weight: 600;
+            }
+            .booking-detail {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 8px;
+                font-size: 15px;
+            }
+            .booking-detail strong {
+                color: #333;
+                font-weight: 600;
+            }
+            .review-section {
+                background: linear-gradient(135deg, #0C7157 0%, #0a5d4a 100%);
+                color: white;
+                padding: 30px;
+                margin: 30px 0;
+                border-radius: 12px;
+                text-align: center;
+            }
+            .review-title {
+                font-size: 22px;
+                font-weight: 600;
+                margin-bottom: 15px;
+            }
+            .review-description {
+                font-size: 16px;
+                margin-bottom: 25px;
+                opacity: 0.9;
+                line-height: 1.6;
+            }
+            .review-button {
+                display: inline-block;
+                background: white;
+                color: #0C7157;
+                padding: 15px 30px;
+                text-decoration: none;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 16px;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            }
+            .review-button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            }
+            .stars {
+                font-size: 24px;
+                margin-bottom: 15px;
+            }
+            .footer {
+                background-color: #f8f9fa;
+                text-align: center;
+                padding: 30px 20px;
+                color: #666;
+            }
+            .footer p {
+                margin-bottom: 10px;
+            }
+            .social-links {
+                margin: 20px 0;
+            }
+            .social-links a {
+                display: inline-block;
+                margin: 0 10px;
+                color: #0C7157;
+                text-decoration: none;
+                font-weight: 500;
+                transition: color 0.3s ease;
+            }
+            .social-links a:hover {
+                color: #0a5d4a;
+            }
+            @media (max-width: 600px) {
+                .container {
+                    margin: 10px;
+                    border-radius: 0;
+                }
+                .content {
+                    padding: 20px;
+                }
+                .header {
+                    padding: 30px 20px;
+                }
+                .company-name {
+                    font-size: 24px;
+                }
+                .greeting {
+                    font-size: 20px;
+                }
+                .booking-detail {
+                    flex-direction: column;
+                    gap: 5px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <!-- Header -->
+            <div class="header">
+                <img src="${logoUrl}" alt="Company Logo" class="logo">
+                <div class="company-name">${emailConfig.from.name}</div>
+                <div class="tagline">Your trusted travel partner</div>
+            </div>
+
+            <!-- Content -->
+            <div class="content">
+                <div class="greeting">
+                    Thank you, ${reviewData.customerName}! 🙏
+                </div>
+
+                <div class="message">
+                    We hope you had an amazing experience with our ${reviewData.packageType}! 
+                    Your journey with us has come to an end, and we'd love to hear about your experience.
+                </div>
+
+                <div class="booking-summary">
+                    <h3>📋 Your Booking Summary</h3>
+                    <div class="booking-detail">
+                        <span><strong>Booking ID:</strong></span>
+                        <span>#${reviewData.bookingId}</span>
+                    </div>
+                    <div class="booking-detail">
+                        <span><strong>Service:</strong></span>
+                        <span>${reviewData.packageName}</span>
+                    </div>
+                    <div class="booking-detail">
+                        <span><strong>Date:</strong></span>
+                        <span>${formatDate(reviewData.date)}</span>
+                    </div>
+                    <div class="booking-detail">
+                        <span><strong>Time:</strong></span>
+                        <span>${formatTime(reviewData.time)}</span>
+                    </div>
+                </div>
+
+                <div class="message">
+                    Your feedback helps us improve our services and assists future travelers in making informed decisions. 
+                    It only takes a few minutes and means the world to us! 🌟
+                </div>
+
+                <div class="review-section">
+                    <div class="stars">⭐⭐⭐⭐⭐</div>
+                    <div class="review-title">Share Your Experience</div>
+                    <div class="review-description">
+                        Click the button below to share your thoughts about our service. 
+                        Your honest feedback is invaluable to us and other travelers!
+                    </div>
+                    <a href="${reviewData.reviewFormUrl}" class="review-button">
+                        📝 Leave a Review
+                    </a>
+                </div>
+
+                <div class="message">
+                    Thank you for choosing ${emailConfig.from.name}. We look forward to serving you again soon! 
+                    <br><br>
+                    Warm regards,<br>
+                    <strong>The ${emailConfig.from.name} Team</strong>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                <p><strong>${emailConfig.from.name}</strong></p>
+                <p>Your trusted travel partner</p>
+                <div class="social-links">
+                    <a href="mailto:${emailConfig.templates.supportEmail}">
+                        <svg style="width: 16px; height: 16px; margin-right: 4px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
+                            <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
+                        </svg>
+                        Email
+                    </a>
+                    <a href="tel:${emailConfig.templates.supportPhone}">
+                        <svg style="width: 16px; height: 16px; margin-right: 4px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
+                        </svg>
+                        Call
+                    </a>
+                    <a href="${emailConfig.templates.website}">
+                        <svg style="width: 16px; height: 16px; margin-right: 4px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4.083 9h1.946c.089-1.546.383-2.97.837-4.118A6.004 6.004 0 004.083 9zM10 2a8 8 0 100 16 8 8 0 000-16zm0 2c-.076 0-.232.032-.465.262-.238.234-.497.623-.737 1.182-.389.907-.673 2.142-.766 3.556h3.936c-.093-1.414-.377-2.649-.766-3.556-.24-.56-.5-.948-.737-1.182C10.232 4.032 10.076 4 10 4zm3.971 5c-.089-1.546-.383-2.97-.837-4.118A6.004 6.004 0 0115.917 9h-1.946zm-2.003 2H8.032c.093 1.414.377 2.649.766 3.556.24.56.5.948.737 1.182.233.23.389.262.465.262.076 0 .232-.032.465-.262.238-.234.498-.623.737-1.182.389-.907.673-2.142.766-3.556zm1.166 4.118c.454-1.147.748-2.572.837-4.118h1.946a6.004 6.004 0 01-2.783 4.118zm-6.268 0C6.412 13.97 6.118 12.546 6.03 11H4.083a6.004 6.004 0 002.783 4.118z" clip-rule="evenodd"/>
+                        </svg>
+                        Website
+                    </a>
+                </div>
+                <p style="font-size: 12px; color: #bbb; margin-top: 20px; font-family: 'Poppins', sans-serif;">
+                    This email was sent to ${reviewData.customerEmail}<br>
                     © ${new Date().getFullYear()} ${emailConfig.from.name}. All rights reserved.
                 </p>
             </div>

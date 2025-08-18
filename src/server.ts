@@ -1,6 +1,7 @@
 import './config/env'; // Load environment variables first
 import app from './app';
 import connectDB from './config/db';
+import reviewScheduler from './services/reviewScheduler.service';
 
 const PORT = Number(process.env.PORT) || 3002;
 const HOST = process.env.HOST || '10.22.11.50';
@@ -9,9 +10,25 @@ const HOST = process.env.HOST || '10.22.11.50';
 connectDB().then(() => {
     // Only start the server after successful database connection
     app.listen(PORT, () => {
-        console.log(`Server running on http://${HOST}:${PORT}`)
+        console.log(`Server running on http://${HOST}:${PORT}`);
+        
+        // Start the review email scheduler
+        reviewScheduler.start();
     });
 }).catch(error => {
     console.error('Failed to connect to MongoDB:', error);
     process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully...');
+    reviewScheduler.stop();
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    console.log('SIGINT received, shutting down gracefully...');
+    reviewScheduler.stop();
+    process.exit(0);
 });
