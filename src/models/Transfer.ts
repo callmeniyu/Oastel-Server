@@ -17,6 +17,7 @@ export interface TransferType extends Document {
     tags: string[]
     desc: string
     type: "Van" | "Van + Ferry" | "Private"
+    vehicle?: string // Vehicle name for private transfers
     packageType: "transfer"
     duration: string
     status: "active" | "sold"
@@ -43,6 +44,7 @@ const TransferSchema = new Schema<TransferType>(
         tags: [String],
         desc: String,
         type: { type: String, enum: ["Van", "Van + Ferry", "Private"] },
+        vehicle: { type: String }, // Vehicle name for private transfers
         packageType: { type: String, default: "transfer" },
         duration: String,
         status: { type: String, enum: ["active", "sold"], default: "active" },

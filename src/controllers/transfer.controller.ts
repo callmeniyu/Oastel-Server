@@ -6,7 +6,10 @@ import { TimeSlotService } from "../services/timeSlot.service"
 
 export const createTransfer = async (req: Request, res: Response) => {
     try {
-        const transferData = req.body
+    const transferData = req.body
+    // Debug: log incoming vehicle field to help trace missing vehicle issues
+    console.log('createTransfer - incoming vehicle:', transferData?.vehicle)
+    console.log('createTransfer - incoming keys:', Object.keys(transferData || {}))
 
         // Ensure packageType is always 'transfer'
         transferData.packageType = "transfer"
@@ -37,8 +40,24 @@ export const createTransfer = async (req: Request, res: Response) => {
             transferData.label = null
         }
 
+        // Ensure vehicle field is preserved when provided by clients
+        if (typeof transferData.vehicle === 'undefined' && transferData?.details?.vehicle) {
+            transferData.vehicle = transferData.details.vehicle
+        }
+        // Normalize empty strings to undefined so mongoose doesn't store empty values
+        if (transferData.vehicle === "") {
+            delete transferData.vehicle
+        }
+
         const transfer = new Transfer(transferData)
         const savedTransfer = await transfer.save()
+        // Debug: log saved document vehicle to verify persistence
+        try {
+            console.log('createTransfer - savedTransfer.vehicle:', savedTransfer.vehicle)
+            console.log('createTransfer - savedTransfer keys:', Object.keys(savedTransfer.toObject ? savedTransfer.toObject() : savedTransfer))
+        } catch (err) {
+            console.warn('createTransfer - failed to log savedTransfer details', err)
+        }
 
         // Generate time slots for the transfer (90 days ahead)
         try {
@@ -86,12 +105,16 @@ export const createTransfer = async (req: Request, res: Response) => {
 
 export const getTransfers = async (req: Request, res: Response) => {
     try {
-        const { page = 1, limit = 10, type, search } = req.query
+        const { page = 1, limit = 10, type, vehicle, search } = req.query
 
         const query: any = {}
 
         if (type && type !== "all") {
             query.type = type
+        }
+
+        if (vehicle) {
+            query.vehicle = vehicle
         }
 
         if (search) {
@@ -173,10 +196,32 @@ export const getTransferBySlug = async (req: Request, res: Response) => {
     }
 }
 
+export const getLastTransfer = async (req: Request, res: Response) => {
+    try {
+        const transfer = await Transfer.findOne({}).sort({ createdAt: -1 }).lean()
+        if (!transfer) {
+            return res.status(404).json({ success: false, message: 'No transfers found' })
+        }
+        res.json({ success: true, data: transfer })
+    } catch (error: any) {
+        console.error('Error fetching last transfer:', error)
+        res.status(500).json({ success: false, message: 'Internal server error' })
+    }
+}
+
 export const updateTransfer = async (req: Request, res: Response) => {
     try {
         const { id } = req.params
         const transferData = req.body
+    // Debug: log incoming vehicle field for update
+    try {
+        console.log('updateTransfer - incoming vehicle:', transferData?.vehicle)
+        console.log('updateTransfer - incoming keys:', Object.keys(transferData || {}))
+        // print snapshot of incoming transferData (safe stringify)
+        console.log('updateTransfer - incoming snapshot:', JSON.stringify(transferData))
+    } catch (err) {
+        console.warn('updateTransfer - error logging incoming data', err)
+    }
 
         // Get existing transfer to check if image changed
         const existingTransfer = await Transfer.findById(id)
@@ -189,6 +234,19 @@ export const updateTransfer = async (req: Request, res: Response) => {
 
         // Ensure packageType is always 'transfer'
         transferData.packageType = "transfer"
+
+        // Ensure vehicle field is preserved on update if provided (avoid accidental omission)
+        if (typeof transferData.vehicle === 'undefined' && req.body.vehicle) {
+            transferData.vehicle = req.body.vehicle
+        }
+        if (transferData.vehicle === "") {
+            // allow clearing vehicle by sending null explicitly
+            if (req.body.vehicle === "") {
+                transferData.vehicle = null
+            } else {
+                delete transferData.vehicle
+            }
+        }
 
         // Handle label - convert "None" to null
         if (transferData.label === "None") {
@@ -205,7 +263,14 @@ export const updateTransfer = async (req: Request, res: Response) => {
         // Note: With Cloudinary, we don't need to delete old images locally
         // Cloudinary handles storage and we can optionally clean up old images via their API
 
-        const transfer = await Transfer.findByIdAndUpdate(id, transferData, { new: true, runValidators: true })
+    // Ensure vehicle field is not accidentally omitted when updating
+    // (transferData may or may not include vehicle; passing transferData as-is lets mongoose update provided fields)
+    const transfer = await Transfer.findByIdAndUpdate(id, transferData, { new: true, runValidators: true })
+    try {
+        console.log('updateTransfer - updated transfer vehicle:', transfer?.vehicle)
+    } catch (err) {
+        console.warn('updateTransfer - failed to log updated transfer', err)
+    }
 
         if (!transfer) {
             return res.status(404).json({
@@ -344,6 +409,27 @@ export const checkSlugAvailability = async (req: Request, res: Response) => {
         })
     } catch (error: any) {
         console.error("Error checking slug availability:", error)
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        })
+    }
+}
+
+export const getVehicles = async (req: Request, res: Response) => {
+    try {
+        // Get unique vehicles from private transfers
+        const vehicles = await Transfer.distinct("vehicle", {
+            type: "Private",
+            vehicle: { $exists: true, $nin: [null, ""] }
+        })
+
+        res.json({
+            success: true,
+            data: vehicles,
+        })
+    } catch (error: any) {
+        console.error("Error fetching vehicles:", error)
         res.status(500).json({
             success: false,
             message: "Internal server error",

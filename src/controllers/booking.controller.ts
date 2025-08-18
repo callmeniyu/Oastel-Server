@@ -70,7 +70,8 @@ class BookingController {
           packageId: packageId,
           packageName: packageDetails?.title || (packageType === 'tour' ? 'Tour Package' : 'Transfer Service'),
           packageType,
-          date: new Date(date).toLocaleDateString(),
+          // Send ISO date string so server email formatter can reliably parse it
+          date: (booking as any).date ? (booking as any).date.toISOString() : new Date(date).toISOString(),
           time,
           adults,
           children: children || 0,

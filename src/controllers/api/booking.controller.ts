@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Booking from '../../models/Booking';
 import TimeSlot from '../../models/TimeSlot';
 import { Types } from 'mongoose';
+import { TimeSlotService } from '../../services/timeSlot.service';
 
 export async function createBooking(req: Request, res: Response) {
   try {
@@ -15,7 +16,9 @@ export async function createBooking(req: Request, res: Response) {
       children,
       pickupLocation,
       contactInfo,
-      subtotal
+      subtotal,
+      paymentInfo,
+      isAdminBooking
     } = req.body;
 
     // Find or create time slot
@@ -50,9 +53,35 @@ export async function createBooking(req: Request, res: Response) {
       });
     }
 
-    // Calculate bank charge (2.8%)
-    const bankCharge = subtotal * 0.028;
-    const total = subtotal + bankCharge;
+    // Check minimum person rule for first booking
+    const isFirstBooking = slot.bookedCount === 0;
+    const requiredMinimum = slot.minimumPerson || 1;
+    
+    if (isFirstBooking && totalGuests < requiredMinimum) {
+      return res.status(400).json({
+        success: false,
+        message: `This is the first booking for this time slot. Minimum ${requiredMinimum} person${requiredMinimum > 1 ? 's' : ''} required.`
+      });
+    }
+
+    let bookingPaymentInfo;
+    let total;
+
+    if (isAdminBooking && paymentInfo) {
+      // For admin bookings, use the provided payment info (no bank charges)
+      bookingPaymentInfo = paymentInfo;
+      total = paymentInfo.amount;
+    } else {
+      // For regular customer bookings, calculate bank charge (2.8%)
+      const bankCharge = subtotal * 0.028;
+      total = subtotal + bankCharge;
+      bookingPaymentInfo = {
+        amount: total,
+        bankCharge,
+        currency: 'MYR',
+        paymentStatus: 'pending'
+      };
+    }
 
     // Create booking
     const booking = new Booking({
@@ -68,12 +97,8 @@ export async function createBooking(req: Request, res: Response) {
       contactInfo,
       subtotal,
       total,
-      paymentInfo: {
-        amount: total,
-        bankCharge,
-        currency: 'MYR',
-        paymentStatus: 'pending'
-      }
+      paymentInfo: bookingPaymentInfo,
+      ...(isAdminBooking && { isAdminBooking: true })
     });
 
     // Update slot booking count
@@ -87,6 +112,21 @@ export async function createBooking(req: Request, res: Response) {
     }
 
     await Promise.all([booking.save(), timeSlot.save()]);
+
+    // Update slot with proper minimum person logic using TimeSlotService
+    try {
+      await TimeSlotService.updateSlotBooking(
+        packageType,
+        new Types.ObjectId(packageId),
+        date,
+        time,
+        totalGuests,
+        'add'
+      );
+    } catch (updateError) {
+      console.warn('Warning: TimeSlotService update failed:', updateError);
+      // Don't fail the booking if slot service update fails
+    }
 
     return res.status(201).json({
       success: true,

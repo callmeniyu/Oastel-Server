@@ -210,30 +210,9 @@ export class CartBookingService {
 
           // Send confirmation email for this booking
           try {
-            const emailService = new EmailService();
-            const emailData = {
-              customerName: request.contactInfo.name,
-              customerEmail: request.contactInfo.email,
-              bookingId: savedBooking._id.toString(),
-              packageId: item.packageId.toString(),
-              packageName: item.packageTitle,
-              packageType: item.packageType,
-              date: new Date(item.selectedDate).toLocaleDateString(),
-              time: item.selectedTime,
-              adults: item.adults,
-              children: item.children,
-              pickupLocation: item.pickupLocation || '',
-              total: bookingData.total,
-              currency: 'MYR'
-            };
-            
-            await emailService.sendBookingConfirmation(emailData);
-            console.log(`📧 Confirmation email sent for booking ${savedBooking._id}`);
+            console.log(`📧 Booking ${savedBooking._id} created, will send consolidated cart email later`);
           } catch (emailError: any) {
-            console.error(`⚠️  Failed to send confirmation email for booking ${savedBooking._id}:`, emailError.message);
-            // Don't fail the booking if email fails - just log the warning
-            result.warnings = result.warnings || [];
-            result.warnings.push(`Email confirmation could not be sent for ${item.packageTitle}`);
+            console.error(`⚠️  Failed to prepare email data for booking ${savedBooking._id}:`, emailError.message);
           }
 
         } catch (itemError: any) {
@@ -257,6 +236,9 @@ export class CartBookingService {
 
       // If at least one booking was created successfully
       if (result.bookings.length > 0) {
+        // Store cart items before clearing for email data
+        const cartItemsForEmail = cart.items;
+
         // Clear the cart after successful bookings
         await Cart.findOneAndUpdate(
           { userId: user._id },
@@ -266,6 +248,55 @@ export class CartBookingService {
 
         result.success = true;
         await session.commitTransaction();
+
+        // Send consolidated cart confirmation email
+        try {
+          const emailService = new EmailService();
+          // Build email data from cart items and booking IDs
+          const cartEmailData = {
+            customerName: request.contactInfo.name,
+            customerEmail: request.contactInfo.email,
+            bookings: cartItemsForEmail.map((cartItem: any, index: number) => {
+              const bookingId = result.bookings[index] || '';
+              const itemPrice = Number(cartItem?.totalPrice) || 0;
+              const bankCharge = Number(itemPrice * 0.028) || 0;
+              const total = Number(itemPrice + bankCharge);
+              // Ensure we pass a deterministic ISO date string to the email builder
+              const rawDate = cartItem?.selectedDate || '';
+              const safeIsoDate = rawDate
+                ? new Date(new Date(rawDate).toISOString().split('T')[0] + 'T12:00:00.000Z').toISOString()
+                : '';
+
+              return {
+                bookingId,
+                packageId: String(cartItem?.packageId || ''),
+                packageName: cartItem?.packageTitle || 'Package',
+                packageType: cartItem?.packageType || 'tour',
+                from: cartItem?.pickupLocation || '',
+                to: cartItem?.pickupLocation || '',
+                date: safeIsoDate,
+                time: cartItem?.selectedTime || '',
+                adults: cartItem?.adults || 1,
+                children: cartItem?.children || 0,
+                pickupLocation: cartItem?.pickupLocation || '',
+                total
+              };
+            }),
+            totalAmount: cartItemsForEmail.reduce((sum: number, item: any) => {
+              const p = Number(item?.totalPrice) || 0;
+              const bc = Number(p * 0.028) || 0;
+              return sum + p + bc;
+            }, 0),
+            currency: 'MYR'
+          };
+           
+           await emailService.sendCartBookingConfirmation(cartEmailData);
+           console.log(`📧 Consolidated cart confirmation email sent to ${request.contactInfo.email} for ${result.bookings.length} bookings`);
+         } catch (emailError: any) {
+          console.error(`⚠️ Failed to send consolidated cart confirmation email:`, emailError.message);
+          result.warnings = result.warnings || [];
+          result.warnings.push('Cart confirmation email could not be sent');
+        }
       } else {
         result.errors.push('No bookings could be created from cart items');
         await session.abortTransaction();

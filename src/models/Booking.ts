@@ -34,6 +34,7 @@ export interface Booking extends Document {
   paymentInfo: PaymentInfo;
   subtotal: number;
   total: number;
+  isAdminBooking?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -77,6 +78,7 @@ const BookingSchema: Schema = new Schema(
     },
     subtotal: { type: Number, required: true },
     total: { type: Number, required: true },
+    isAdminBooking: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
