@@ -122,6 +122,7 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
+dist
 
 # Uploads directory - keep the structure but ignore files
 uploads/*
