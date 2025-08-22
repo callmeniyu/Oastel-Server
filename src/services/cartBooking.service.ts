@@ -172,40 +172,71 @@ export class CartBookingService {
           // Update slot booking count using TimeSlotService
           const totalGuests = item.adults + item.children;
           try {
-            await TimeSlotService.updateSlotBooking(
-              item.packageType,
-              item.packageId,
-              new Date(item.selectedDate).toISOString().split('T')[0],
-              item.selectedTime,
-              totalGuests,
-              "add"
-            );
-            console.log(`✅ Updated slot booking count by ${totalGuests} for ${item.packageTitle}`);
-          } catch (slotError: any) {
-            console.error(`⚠️ Failed to update slot booking count for ${item.packageTitle}:`, slotError.message);
-            result.warnings.push(`Slot booking count could not be updated for ${item.packageTitle}`);
-          }
+            // For private transfers, booking is per-vehicle: update slot by 1 vehicle booking
+            if (item.packageType === 'transfer') {
+              const pkg = packageDoc as any;
+              const isPrivate = pkg && (pkg.type === 'Private' || pkg.type === 'private');
+              if (isPrivate) {
+                // Use 1 as the increment for vehicle booking and pass seatCapacity as personsCount for internal checks
+                const seatCap = pkg.seatCapacity || pkg.maximumPerson || 1;
+                await TimeSlotService.updateSlotBooking(
+                  item.packageType,
+                  item.packageId,
+                  new Date(item.selectedDate).toISOString().split('T')[0],
+                  item.selectedTime,
+                  1, // one vehicle
+                  "add"
+                );
+                console.log(`✅ Updated slot booking count by 1 vehicle for ${item.packageTitle}`);
 
-          // Update package bookedCount
-          try {
-            if (item.packageType === 'tour') {
+                // Update package bookedCount by 1 (vehicle count)
+                await Transfer.findByIdAndUpdate(
+                  item.packageId,
+                  { $inc: { bookedCount: 1 } },
+                  { session }
+                );
+                console.log(`✅ Updated Transfer bookedCount by 1 for package ${item.packageId}`);
+              } else {
+                await TimeSlotService.updateSlotBooking(
+                  item.packageType,
+                  item.packageId,
+                  new Date(item.selectedDate).toISOString().split('T')[0],
+                  item.selectedTime,
+                  totalGuests,
+                  "add"
+                );
+                console.log(`✅ Updated slot booking count by ${totalGuests} for ${item.packageTitle}`);
+
+                // Update package bookedCount by totalGuests for non-private transfers
+                await Transfer.findByIdAndUpdate(
+                  item.packageId,
+                  { $inc: { bookedCount: totalGuests } },
+                  { session }
+                );
+                console.log(`✅ Updated Transfer bookedCount by ${totalGuests} for package ${item.packageId}`);
+              }
+            } else {
+              // Tours: update by total guests
+              await TimeSlotService.updateSlotBooking(
+                item.packageType,
+                item.packageId,
+                new Date(item.selectedDate).toISOString().split('T')[0],
+                item.selectedTime,
+                totalGuests,
+                "add"
+              );
+              console.log(`✅ Updated slot booking count by ${totalGuests} for ${item.packageTitle}`);
+
               await Tour.findByIdAndUpdate(
                 item.packageId,
                 { $inc: { bookedCount: totalGuests } },
                 { session }
               );
               console.log(`✅ Updated Tour bookedCount by ${totalGuests} for package ${item.packageId}`);
-            } else if (item.packageType === 'transfer') {
-              await Transfer.findByIdAndUpdate(
-                item.packageId,
-                { $inc: { bookedCount: totalGuests } },
-                { session }
-              );
-              console.log(`✅ Updated Transfer bookedCount by ${totalGuests} for package ${item.packageId}`);
             }
-          } catch (countError: any) {
-            console.error(`⚠️ Failed to update package bookedCount for ${item.packageTitle}:`, countError.message);
-            result.warnings.push(`Package booking count could not be updated for ${item.packageTitle}`);
+          } catch (slotError: any) {
+            console.error(`⚠️ Failed to update slot booking count for ${item.packageTitle}:`, slotError.message);
+            result.warnings.push(`Slot booking count could not be updated for ${item.packageTitle}`);
           }
 
           // Send confirmation email for this booking

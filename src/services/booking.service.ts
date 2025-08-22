@@ -79,31 +79,52 @@ class BookingService {
 
       const savedBooking = await booking.save();
 
-      // Update slot booking count using TimeSlotService
-      await TimeSlotService.updateSlotBooking(
-        data.packageType,
-        data.packageId,
-        data.date.toISOString().split('T')[0],
-        data.time,
-        totalGuests,
-        "add"
-      );
+      // Update slot booking count using TimeSlotService and package bookedCount
+      const PackageModel = data.packageType === 'tour' ? mongoose.model('Tour') : mongoose.model('Transfer');
+      const pkg = await PackageModel.findById(data.packageId);
+      const isPrivate = pkg && (pkg.type === 'Private' || pkg.type === 'private');
 
-      // Update package bookedCount
-      if (data.packageType === 'tour') {
-        const TourModel = mongoose.model('Tour');
-        await TourModel.findByIdAndUpdate(
+      if (isPrivate && data.packageType === 'transfer') {
+        // For private transfers, treat as one vehicle booking
+        await TimeSlotService.updateSlotBooking(
+          data.packageType,
           data.packageId,
-          { $inc: { bookedCount: totalGuests } }
+          data.date.toISOString().split('T')[0],
+          data.time,
+          1, // one vehicle
+          "add"
         );
-        console.log(`✅ Updated Tour bookedCount by ${totalGuests} for package ${data.packageId}`);
-      } else if (data.packageType === 'transfer') {
         const TransferModel = mongoose.model('Transfer');
         await TransferModel.findByIdAndUpdate(
           data.packageId,
-          { $inc: { bookedCount: totalGuests } }
+          { $inc: { bookedCount: 1 } }
         );
-        console.log(`✅ Updated Transfer bookedCount by ${totalGuests} for package ${data.packageId}`);
+        console.log(`✅ Updated Transfer bookedCount by 1 for package ${data.packageId}`);
+      } else {
+        // Non-private: update by total guests
+        await TimeSlotService.updateSlotBooking(
+          data.packageType,
+          data.packageId,
+          data.date.toISOString().split('T')[0],
+          data.time,
+          totalGuests,
+          "add"
+        );
+        if (data.packageType === 'tour') {
+          const TourModel = mongoose.model('Tour');
+          await TourModel.findByIdAndUpdate(
+            data.packageId,
+            { $inc: { bookedCount: totalGuests } }
+          );
+          console.log(`✅ Updated Tour bookedCount by ${totalGuests} for package ${data.packageId}`);
+        } else if (data.packageType === 'transfer') {
+          const TransferModel = mongoose.model('Transfer');
+          await TransferModel.findByIdAndUpdate(
+            data.packageId,
+            { $inc: { bookedCount: totalGuests } }
+          );
+          console.log(`✅ Updated Transfer bookedCount by ${totalGuests} for package ${data.packageId}`);
+        }
       }
 
       return savedBooking;

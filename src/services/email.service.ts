@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { emailConfig } from '../config/email.config';
 import { Types } from 'mongoose';
+import { BrevoEmailService } from './brevo.service';
 
 export interface BookingEmailData {
   customerName: string;
@@ -61,6 +62,15 @@ export class EmailService {
    */
   async sendBookingConfirmation(booking: BookingEmailData): Promise<boolean> {
     try {
+      // Try Brevo first (bypasses SMTP port blocking)
+      if (process.env.BREVO_API_KEY) {
+        console.log('📧 Using Brevo API for email delivery...');
+        return await BrevoEmailService.sendBookingConfirmation(booking);
+      }
+
+      // Fallback to SMTP if Brevo is not configured
+      console.log('📧 Brevo not configured, falling back to SMTP...');
+      
       // Validate required environment variables
       if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
         console.error('❌ Missing required email environment variables:');
@@ -105,6 +115,15 @@ export class EmailService {
    */
   async sendCartBookingConfirmation(cartData: CartBookingEmailData): Promise<boolean> {
     try {
+      // Try Brevo first (bypasses SMTP port blocking)
+      if (process.env.BREVO_API_KEY) {
+        console.log('📧 Using Brevo API for cart booking email delivery...');
+        return await BrevoEmailService.sendCartBookingConfirmation(cartData);
+      }
+
+      // Fallback to SMTP if Brevo is not configured
+      console.log('📧 Brevo not configured, falling back to SMTP...');
+      
       // Validate required environment variables
       if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
         console.error('❌ Missing required email environment variables:');
@@ -140,6 +159,15 @@ export class EmailService {
    */
   async sendReviewRequest(reviewData: ReviewEmailData): Promise<boolean> {
     try {
+      // Try Brevo first (bypasses SMTP port blocking)
+      if (process.env.BREVO_API_KEY) {
+        console.log('📧 Using Brevo API for review request email delivery...');
+        return await BrevoEmailService.sendReviewRequest(reviewData);
+      }
+
+      // Fallback to SMTP if Brevo is not configured
+      console.log('📧 Brevo not configured, falling back to SMTP...');
+      
       // Validate required environment variables
       if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
         console.error('❌ Missing required email environment variables for review email');

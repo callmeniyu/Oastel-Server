@@ -78,7 +78,8 @@ export const createTransfer = async (req: Request, res: Response) => {
                 "transfer",
                 savedTransfer._id as Types.ObjectId,
                 transferData.times || [],
-                transferData.maximumPerson || 10
+                    // Use seatCapacity for private transfers if provided, else maximumPerson
+                    (transferData.seatCapacity && Number(transferData.seatCapacity)) || transferData.maximumPerson || 10
             )
             console.log(`Time slots generated for transfer: ${savedTransfer._id}`)
         } catch (slotError) {
@@ -303,10 +304,11 @@ export const updateTransfer = async (req: Request, res: Response) => {
         // Update time slots if times or capacity changed
         try {
             const times = transferData.times || existingTransfer.times
-            const capacity = transferData.maximumPerson || existingTransfer.maximumPerson || 10
+                // Use seatCapacity for private transfers when provided, otherwise fall back to maximumPerson
+                const capacity = (transferData.seatCapacity && Number(transferData.seatCapacity)) || transferData.maximumPerson || existingTransfer.maximumPerson || 10
             
             if (JSON.stringify(times) !== JSON.stringify(existingTransfer.times) || 
-                capacity !== existingTransfer.maximumPerson) {
+                    capacity !== (existingTransfer.seatCapacity || existingTransfer.maximumPerson)) {
                 await TimeSlotService.updateSlotsForPackage(
                     "transfer",
                     transfer._id as Types.ObjectId,

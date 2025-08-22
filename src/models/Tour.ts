@@ -5,6 +5,7 @@ export interface TourDetails {
     about: string
     itinerary: string
     pickupLocation: string
+    pickupGuidelines?: string
     note?: string
     faq: Types.DocumentArray<FAQType>
 }
@@ -57,6 +58,7 @@ const TourSchema = new Schema<TourType>(
             about: String,
             itinerary: String,
             pickupLocation: String,
+            pickupGuidelines: String,
             note: String,
             faq: [
                 {

@@ -13,6 +13,8 @@ import timeSlotRoutes from "./routes/timeSlot.routes"
 import cartRoutes from "./routes/cart.routes"
 import cartBookingRoutes from "./routes/cartBooking.routes"
 import userRoutes from "./routes/user.routes"
+import emailRoutes from "./routes/email.routes"
+import vehicleRoutes from "./routes/vehicle.routes"
 
 const app = express()
 
@@ -35,6 +37,9 @@ app.use("/api/timeslots", timeSlotRoutes)
 app.use("/api/cart", cartRoutes)
 app.use("/api/cart-booking", cartBookingRoutes)
 app.use("/api/users", userRoutes)
+app.use("/api/email", emailRoutes)
+// Vehicle management for private transfers
+app.use("/api/vehicles", vehicleRoutes)
 
 
 export default app

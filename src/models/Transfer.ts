@@ -27,6 +27,7 @@ export interface TransferType extends Document {
     childPrice: number
     minimumPerson: number
     maximumPerson?: number
+    seatCapacity?: number
     times: string[] // e.g. ["08:00 AM","01:30 PM"]
     label?: "Recommended" | "Popular" | "Best Value"
     from: string
@@ -54,6 +55,7 @@ const TransferSchema = new Schema<TransferType>(
         childPrice: Number,
         minimumPerson: Number,
         maximumPerson: Number,
+    seatCapacity: Number,
         times: [String],
         label: { type: String, enum: ["Recommended", "Popular", "Best Value"], default: null },
         from: String,

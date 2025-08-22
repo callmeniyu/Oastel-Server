@@ -35,6 +35,10 @@ export interface Booking extends Document {
   subtotal: number;
   total: number;
   isAdminBooking?: boolean;
+  // For private-transfer (per-vehicle) bookings
+  isVehicleBooking?: boolean;
+  vehicleSeatCapacity?: number;
+  seatsRequested?: number;
   reviewEmailSent?: boolean;
   reviewEmailSentAt?: Date;
   createdAt: Date;
@@ -81,6 +85,10 @@ const BookingSchema: Schema = new Schema(
     subtotal: { type: Number, required: true },
     total: { type: Number, required: true },
     isAdminBooking: { type: Boolean, default: false },
+  // For private transfer bookings
+  isVehicleBooking: { type: Boolean, default: false },
+  vehicleSeatCapacity: { type: Number },
+  seatsRequested: { type: Number },
     reviewEmailSent: { type: Boolean, default: false },
     reviewEmailSentAt: { type: Date },
   },
