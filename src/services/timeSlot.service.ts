@@ -296,7 +296,6 @@ export class TimeSlotService {
                     console.error(`❌ VERIFICATION FAILED! Expected minimumPerson=${newMinimumPerson}, got ${verifySlot.minimumPerson}`);
                 } else {
                     console.log(`✅ VERIFICATION SUCCESS! MinimumPerson correctly set to ${verifySlot.minimumPerson}`);
-                    console.log("latest commit1")
                 }
             } else {
                 console.log('⚠️ Database verification failed: TimeSlot not found');

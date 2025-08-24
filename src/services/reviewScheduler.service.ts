@@ -33,6 +33,7 @@ class ReviewSchedulerService {
     });
 
     console.log('✅ Review email scheduler started successfully');
+    console.log('Latest commit1')
   }
 
   /**
