@@ -399,15 +399,23 @@ export class BrevoEmailService {
           </div>
         </div>
 
-                <div class="info-box">
-                    <h3 style="color: #8c7a00; margin-bottom: 10px; font-weight: 600;">Important Information:</h3>
-                    <ul style="color: #8c7a00; padding-left: 20px; line-height: 1.8;">
-                        <li>Please arrive 15 minutes before your scheduled time</li>
-                        <li>Bring a valid ID and this confirmation email</li>
-                        <li>For any changes, contact us at least 24 hours in advance</li>
-                        <li>Weather conditions may affect outdoor activities</li>
-                    </ul>
-                </div>
+        <div class="info-box">
+          <h3 style="color: #8c7a00; margin-bottom: 10px; font-weight: 600;">Important Information:</h3>
+          <ul style="color: #8c7a00; padding-left: 20px; line-height: 1.8;">
+            <li>Be ready at your hotel's main gate 5 minutes before pick-up.</li>
+            <li>No child seats are available. Children must always be with an adult.</li>
+            <li>Pick-up times and locations may vary for each booking.</li>
+            <li>Cancellation Policy:
+              <ul style="margin-top:8px; padding-left:18px;">
+                <li>Cancel at least 72 hours in advance for a full refund.</li>
+                <li>No refund, cancellation, or date change within 72 hours.</li>
+              </ul>
+            </li>
+            <li>Bring enough cash for entrance fees and food.</li>
+            <li>Luggage and large backpacks cannot be brought on the tour.</li>
+            <li>Views depend on the weather and cannot be guaranteed.</li>
+          </ul>
+        </div>
 
                 <p class="email-text" style="margin-top: 30px; color: #444;">
                     If you have any questions please don't hesitate to contact us. We're here to make your experience unforgettable!
@@ -568,15 +576,23 @@ export class BrevoEmailService {
                 <h3 style="color: #0C7157; margin: 30px 0 15px 0;">Your Bookings:</h3>
                 ${bookingRows}
 
-                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 25px 0;">
-                    <h3 style="color: #8c7a00; margin-bottom: 10px;">Important Information:</h3>
-                    <ul style="color: #8c7a00; padding-left: 20px; line-height: 1.8;">
-                        <li>Please arrive 15 minutes before each scheduled time</li>
-                        <li>Bring a valid ID and this confirmation email</li>
-                        <li>For any changes, contact us at least 24 hours in advance</li>
-                        <li>Weather conditions may affect outdoor activities</li>
-                    </ul>
-                </div>
+        <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 25px 0;">
+          <h3 style="color: #8c7a00; margin-bottom: 10px;">Important Information:</h3>
+          <ul style="color: #8c7a00; padding-left: 20px; line-height: 1.8;">
+            <li>Be ready at your hotel's main gate 5 minutes before pick-up.</li>
+            <li>No child seats are available. Children must always be with an adult.</li>
+            <li>Pick-up times and locations may vary for each booking.</li>
+            <li>Cancellation Policy:
+              <ul style="margin-top:8px; padding-left:18px;">
+                <li>Cancel at least 72 hours in advance for a full refund.</li>
+                <li>No refund, cancellation, or date change within 72 hours.</li>
+              </ul>
+            </li>
+            <li>Bring enough cash for entrance fees and food.</li>
+            <li>Luggage and large backpacks cannot be brought on the tour.</li>
+            <li>Views depend on the weather and cannot be guaranteed.</li>
+          </ul>
+        </div>
 
                 <p style="margin-top: 30px; color: #444;">
                     If you have any questions please don't hesitate to contact us. We're here to make your experience unforgettable!
