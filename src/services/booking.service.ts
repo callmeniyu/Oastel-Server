@@ -27,6 +27,7 @@ class BookingService {
       currency: string;
       paymentStatus: string;
     };
+  isVehicleBooking?: boolean;
   }): Promise<Booking> {
     try {
       // Get package details to check minimum person requirement
@@ -43,15 +44,17 @@ class BookingService {
         throw new Error("Package not found");
       }
 
-      const totalGuests = data.adults + data.children;
+  const totalGuests = data.adults + data.children;
       
       // Check slot availability using TimeSlotService (includes minimum person validation)
+      // For vehicle bookings, requestedPersons should be treated as 1 (one vehicle)
+      const requestedPersons = data.isVehicleBooking ? 1 : totalGuests;
       const availability = await TimeSlotService.checkAvailability(
         data.packageType,
         data.packageId,
         data.date.toISOString().split('T')[0],
         data.time,
-        totalGuests
+        requestedPersons
       );
 
       if (!availability.available) {
@@ -84,14 +87,14 @@ class BookingService {
       const pkg = await PackageModel.findById(data.packageId);
       const isPrivate = pkg && (pkg.type === 'Private' || pkg.type === 'private');
 
-      if (isPrivate && data.packageType === 'transfer') {
+    if (isPrivate && data.packageType === 'transfer') {
         // For private transfers, treat as one vehicle booking
         await TimeSlotService.updateSlotBooking(
           data.packageType,
           data.packageId,
           data.date.toISOString().split('T')[0],
           data.time,
-          1, // one vehicle
+      1, // one vehicle
           "add"
         );
         const TransferModel = mongoose.model('Transfer');
@@ -100,14 +103,14 @@ class BookingService {
           { $inc: { bookedCount: 1 } }
         );
         console.log(`✅ Updated Transfer bookedCount by 1 for package ${data.packageId}`);
-      } else {
+    } else {
         // Non-private: update by total guests
         await TimeSlotService.updateSlotBooking(
           data.packageType,
           data.packageId,
           data.date.toISOString().split('T')[0],
           data.time,
-          totalGuests,
+      totalGuests,
           "add"
         );
         if (data.packageType === 'tour') {

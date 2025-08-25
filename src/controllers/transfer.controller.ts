@@ -1,6 +1,7 @@
 import { Request, Response } from "express"
 import { Types } from "mongoose"
 import Transfer, { TransferType } from "../models/Transfer"
+import Vehicle from "../models/Vehicle"
 import { generateSlug } from "../utils/generateSlug"
 import { TimeSlotService } from "../services/timeSlot.service"
 
@@ -74,12 +75,24 @@ export const createTransfer = async (req: Request, res: Response) => {
 
         // Generate time slots for the transfer (90 days ahead)
         try {
+            // Determine capacity: for Private transfers prefer vehicle.units if available
+            let capacity = (transferData.seatCapacity && Number(transferData.seatCapacity)) || transferData.maximumPerson || 10
+            try {
+                if (transferData.type === "Private" && transferData.vehicle) {
+                    const vehicleDoc = await Vehicle.findOne({ name: transferData.vehicle }).lean()
+                    if (vehicleDoc && typeof vehicleDoc.units === 'number') {
+                        capacity = vehicleDoc.units
+                    }
+                }
+            } catch (err) {
+                console.warn('Failed to lookup vehicle for slot capacity, falling back to seatCapacity/maximumPerson', err)
+            }
+
             await TimeSlotService.generateSlotsForPackage(
                 "transfer",
                 savedTransfer._id as Types.ObjectId,
                 transferData.times || [],
-                    // Use seatCapacity for private transfers if provided, else maximumPerson
-                    (transferData.seatCapacity && Number(transferData.seatCapacity)) || transferData.maximumPerson || 10
+                capacity
             )
             console.log(`Time slots generated for transfer: ${savedTransfer._id}`)
         } catch (slotError) {
@@ -304,8 +317,19 @@ export const updateTransfer = async (req: Request, res: Response) => {
         // Update time slots if times or capacity changed
         try {
             const times = transferData.times || existingTransfer.times
-                // Use seatCapacity for private transfers when provided, otherwise fall back to maximumPerson
-                const capacity = (transferData.seatCapacity && Number(transferData.seatCapacity)) || transferData.maximumPerson || existingTransfer.maximumPerson || 10
+                // Use vehicle.units for private transfers when available; otherwise fall back to seatCapacity/maximumPerson
+                let capacity = (transferData.seatCapacity && Number(transferData.seatCapacity)) || transferData.maximumPerson || existingTransfer.maximumPerson || 10
+                try {
+                    if ((transferData.type === "Private" || existingTransfer.type === "Private") && (transferData.vehicle || existingTransfer.vehicle)) {
+                        const vehicleName = transferData.vehicle || existingTransfer.vehicle
+                        const vehicleDoc = await Vehicle.findOne({ name: vehicleName }).lean()
+                        if (vehicleDoc && typeof vehicleDoc.units === 'number') {
+                            capacity = vehicleDoc.units
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Failed to lookup vehicle for updated slot capacity, falling back to provided capacity', err)
+                }
             
             if (JSON.stringify(times) !== JSON.stringify(existingTransfer.times) || 
                     capacity !== (existingTransfer.seatCapacity || existingTransfer.maximumPerson)) {

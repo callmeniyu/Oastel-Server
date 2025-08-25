@@ -18,14 +18,23 @@ class BookingController {
         contactInfo,
         subtotal,
         total,
-        paymentInfo
+        paymentInfo,
+        isVehicleBooking
       } = req.body;
 
       // Validate required fields
-      if (!packageType || !packageId || !date || !time || !adults || adults < 1 || !contactInfo) {
+      // For vehicle bookings (private transfers) adults may be 0 because booking is per-vehicle
+      const adultsCount = typeof adults === 'number' ? adults : 0;
+      if (!packageType || !packageId || !date || !time || !contactInfo) {
         return res.status(400).json({ 
           success: false,
           error: "Missing required fields" 
+        });
+      }
+      if (!isVehicleBooking && adultsCount < 1) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing required fields"
         });
       }
 
@@ -35,8 +44,9 @@ class BookingController {
         packageId: new mongoose.Types.ObjectId(packageId),
         date: new Date(date),
         time,
-        adults,
+        adults: adultsCount,
         children: children || 0,
+        isVehicleBooking: !!isVehicleBooking,
         pickupLocation,
         contactInfo,
         subtotal: subtotal || total,
