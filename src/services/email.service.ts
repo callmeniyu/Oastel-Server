@@ -266,9 +266,10 @@ export class EmailService {
             .detail-row:last-child { border-bottom: none; }
             .detail-label { font-family: 'Poppins', sans-serif; font-weight: 500; color: #444; }
             .detail-value { font-family: 'Poppins', sans-serif; color: #0C7157; font-weight: 600; }
-            .total-row { background: #0C7157; color: #fff; margin: 15px -20px -20px -20px; padding: 18px 20px; border-radius: 0 0 8px 8px; display: flex; justify-content: space-between; align-items: center; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
-            .total-row .detail-label { color: #fff; font-size: 18px; }
-            .total-row .detail-value { color: #fff; font-size: 22px; font-weight: 700; }
+            /* Use conservative spacing for email clients - avoid negative margins which break many clients */
+            .total-row { background: #0C7157; color: #fff; margin-top: 18px; padding: 16px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+            .total-row .detail-label { color: #fff; font-size: 16px; }
+            .total-row .detail-value { color: #fff; font-size: 20px; font-weight: 700; }
             .cta-button { display: inline-block; background: #0C7157; color: #fff; text-decoration: none; padding: 16px 36px; border-radius: 8px; font-family: 'Poppins', sans-serif; font-weight: 600; margin: 24px 0; text-align: center; box-shadow: 0 4px 12px rgba(12, 113, 87, 0.18); transition: transform 0.2s; font-size: 18px; letter-spacing: 0.5px; }
             .cta-button:hover { transform: translateY(-2px); background: #0a5c47; }
             .footer { background: #222; color: #fff; padding: 30px; text-align: center; border-radius: 0 0 12px 12px; }
@@ -303,9 +304,9 @@ export class EmailService {
         <div class="container">
             <!-- Header -->
             <div class="header">
-                <div class="header-content">
-                    <div class="text-logo">Oastel</div>
-                    <h1>
+            <div class="header-content">
+                <div class="text-logo">Oastel</div>
+                <h1>
                         <svg class="icon success-icon" style="width: 24px; height: 24px; margin-right: 8px;" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
                         </svg>
@@ -326,111 +327,418 @@ export class EmailService {
 
                 <p class="email-text">Thank you for choosing ${emailConfig.from.name}! We're excited to confirm your booking for an amazing experience.</p>
 
-                <!-- Package header merged into booking details for tighter layout -->
-                <div class="booking-details" style="padding-top: 10px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-                        <div>
-                            <div style="font-size:18px; font-weight:700; color:#0C7157; margin-bottom:6px;">${booking.packageName}</div>
-                            <div style="color:#666; font-size:13px;">Booking ID: <strong>#${booking.bookingId.slice(-8).toUpperCase()}</strong></div>
-                        </div>
-                        <div style="text-align:right;">
-                            <div style="background: #0C7157; color: white; padding: 8px 12px; border-radius: 8px; display: inline-block; min-width: 100px;">
-                                <div style="font-size:12px; opacity:0.9;">Amount</div>
-                                <div style="font-size:18px; font-weight:700;">${booking.currency} ${booking.total.toFixed(2)}</div>
+                <!-- Redesigned Professional Booking Details Section -->
+                <div class="booking-details-professional" style="
+                    border: 1px solid #e5e7eb; 
+                    border-radius: 16px; 
+                    overflow: hidden; 
+                    margin: 30px 0; 
+                    background: #ffffff;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+                ">
+                    <!-- Header with Package Name and Amount -->
+                    <div style="
+                        background: linear-gradient(135deg, #0C7157 0%, #0a5d4a 100%);
+                        color: white;
+                        padding: 24px 28px;
+                        position: relative;
+                    ">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px;">
+                            <div style="flex: 1;">
+                                <h2 style="
+                                    font-size: 22px; 
+                                    font-weight: 700; 
+                                    margin: 0 0 8px 0; 
+                                    color: white;
+                                    font-family: 'Poppins', sans-serif;
+                                    line-height: 1.2;
+                                ">${booking.packageName}</h2>
+                                <div style="
+                                    font-size: 14px; 
+                                    opacity: 0.9;
+                                    font-family: 'Poppins', sans-serif;
+                                ">
+                                    <span style="font-weight: 500;">Booking Reference:</span> 
+                                    <span style="
+                                        background: rgba(255, 255, 255, 0.2); 
+                                        padding: 4px 10px; 
+                                        border-radius: 6px; 
+                                        font-weight: 600;
+                                        letter-spacing: 0.5px;
+                                        margin-left: 8px;
+                                    ">#${booking.bookingId.slice(-8).toUpperCase()}</span>
+                                </div>
+                            </div>
+                            <div style="
+                                background: rgba(255, 255, 255, 0.15); 
+                                backdrop-filter: blur(10px);
+                                border: 1px solid rgba(255, 255, 255, 0.2);
+                                padding: 16px 20px; 
+                                border-radius: 12px; 
+                                text-align: center;
+                                min-width: 140px;
+                            ">
+                                <div style="
+                                    font-size: 12px; 
+                                    opacity: 0.9; 
+                                    margin-bottom: 4px;
+                                    font-family: 'Poppins', sans-serif;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                ">Total Amount</div>
+                                <div style="
+                                    font-size: 24px; 
+                                    font-weight: 700;
+                                    font-family: 'Poppins', sans-serif;
+                                    line-height: 1;
+                                ">${booking.currency} ${booking.total.toFixed(2)}</div>
                             </div>
                         </div>
                     </div>
 
-                    <div style="margin-top:14px; background:#f9f9f9; padding:14px; border-radius:8px;">
-                    <div class="detail-row">
-                        <span class="detail-label">
-                            <svg class="icon calendar-icon" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
-                            </svg>
-                            Date:
-                        </span>
-                        <span class="detail-value">${formatDate(booking.date)}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">
-                            <svg class="icon clock-icon" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
-                            </svg>
-                            Time:
-                        </span>
-                        <span class="detail-value">${formatTime(booking.time)}</span>
-                    </div>
-                    ${booking.packageType === 'transfer' && booking.from && booking.to ? `
-                    <div class="detail-row">
-                        <span class="detail-label">
-                            <svg class="icon location-icon" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
-                            </svg>
-                            From:
-                        </span>
-                        <span class="detail-value">${booking.from}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">
-                            <svg class="icon location-icon" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
-                            </svg>
-                            To:
-                        </span>
-                        <span class="detail-value">${booking.to}</span>
-                    </div>
-                    ` : ''}
-                    <div class="detail-row">
-                        <span class="detail-label">
-                            <svg class="icon users-icon" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
-                            </svg>
-                            Adults:
-                        </span>
-                        <span class="detail-value">${booking.adults}</span>
-                    </div>
-                    ${booking.children > 0 ? `
-                    <div class="detail-row">
-                        <span class="detail-label">
-                            <svg class="icon users-icon" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
-                            </svg>
-                            Children:
-                        </span>
-                        <span class="detail-value">${booking.children}</span>
-                    </div>
-                    ` : ''}
-                    <div class="detail-row">
-                        <span class="detail-label">
-                            <svg class="icon info-icon" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                            </svg>
-                            Type:
-                        </span>
-                        <span class="detail-value">${booking.packageType === 'tour' ? 'Tour Package' : 'Transfer Service'}</span>
-                    </div>
-                    ${booking.pickupLocation ? `
-                    <div class="detail-row">
-                        <span class="detail-label">
-                            <svg class="icon location-icon" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
-                            </svg>
-                            Pickup:
-                        </span>
-                        <span class="detail-value">${booking.pickupLocation}</span>
-                    </div>
-                    ` : ''}
-                    </div>
-                    </div>
-                    <div class="detail-row total-row" style="margin-top:18px;">
-                        <span class="detail-label">
-                            <svg class="icon price-icon" style="width: 20px; height: 20px; margin-right: 8px;" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
-                            </svg>
-                            Total Amount:
-                        </span>
-                        <span class="detail-value">${booking.currency} ${booking.total.toFixed(2)}</span>
+                    <!-- Booking Information Grid -->
+                    <div style="padding: 28px;">
+                        <!-- Primary Details Row -->
+                        <div style="
+                            display: grid; 
+                            grid-template-columns: 1fr 1fr; 
+                            gap: 24px; 
+                            margin-bottom: 24px;
+                            padding-bottom: 24px;
+                            border-bottom: 1px solid #f3f4f6;
+                        ">
+                            <!-- Date & Time Card -->
+                            <div style="
+                                background: #f8fafc;
+                                border-radius: 12px;
+                                padding: 20px;
+                                border-left: 4px solid #0C7157;
+                            ">
+                                <div style="
+                                    display: flex;
+                                    align-items: center;
+                                    margin-bottom: 12px;
+                                ">
+                                    <div style="
+                                        background: #0C7157;
+                                        border-radius: 8px;
+                                        padding: 8px;
+                                        margin-right: 12px;
+                                    ">
+                                        <svg style="width: 18px; height: 18px;" fill="white" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
+                                        </svg>
+                                    </div>
+                                    <div style="
+                                        font-size: 14px;
+                                        font-weight: 600;
+                                        color: #374151;
+                                        font-family: 'Poppins', sans-serif;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                    ">Schedule</div>
+                                </div>
+                                <div style="
+                                    font-size: 18px;
+                                    font-weight: 700;
+                                    color: #0C7157;
+                                    margin-bottom: 4px;
+                                    font-family: 'Poppins', sans-serif;
+                                ">${formatDate(booking.date)}</div>
+                                <div style="
+                                    font-size: 16px;
+                                    color: #6b7280;
+                                    font-family: 'Poppins', sans-serif;
+                                    font-weight: 500;
+                                ">${formatTime(booking.time)}</div>
+                            </div>
+
+                            <!-- Guests Card -->
+                            <div style="
+                                background: #fef7ff;
+                                border-radius: 12px;
+                                padding: 20px;
+                                border-left: 4px solid #8b5cf6;
+                            ">
+                                <div style="
+                                    display: flex;
+                                    align-items: center;
+                                    margin-bottom: 12px;
+                                ">
+                                    <div style="
+                                        background: #8b5cf6;
+                                        border-radius: 8px;
+                                        padding: 8px;
+                                        margin-right: 12px;
+                                    ">
+                                        <svg style="width: 18px; height: 18px;" fill="white" viewBox="0 0 20 20">
+                                            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                                        </svg>
+                                    </div>
+                                    <div style="
+                                        font-size: 14px;
+                                        font-weight: 600;
+                                        color: #374151;
+                                        font-family: 'Poppins', sans-serif;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                    ">Guests</div>
+                                </div>
+                                <div style="
+                                    display: flex;
+                                    gap: 16px;
+                                    align-items: center;
+                                ">
+                                    <div>
+                                        <div style="
+                                            font-size: 18px;
+                                            font-weight: 700;
+                                            color: #8b5cf6;
+                                            font-family: 'Poppins', sans-serif;
+                                        ">${booking.adults}</div>
+                                        <div style="
+                                            font-size: 13px;
+                                            color: #6b7280;
+                                            font-family: 'Poppins', sans-serif;
+                                        ">Adult${booking.adults > 1 ? 's' : ''}</div>
+                                    </div>
+                                    ${booking.children > 0 ? `
+                                    <div style="
+                                        width: 1px;
+                                        height: 30px;
+                                        background: #d1d5db;
+                                    "></div>
+                                    <div>
+                                        <div style="
+                                            font-size: 18px;
+                                            font-weight: 700;
+                                            color: #8b5cf6;
+                                            font-family: 'Poppins', sans-serif;
+                                        ">${booking.children}</div>
+                                        <div style="
+                                            font-size: 13px;
+                                            color: #6b7280;
+                                            font-family: 'Poppins', sans-serif;
+                                        ">Child${booking.children > 1 ? 'ren' : ''}</div>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+
+                        ${booking.packageType === 'transfer' && booking.from && booking.to ? `
+                        <!-- Transfer Route Information -->
+                        <div style="
+                            background: #fef3e7;
+                            border-radius: 12px;
+                            padding: 24px;
+                            margin-bottom: 24px;
+                            border-left: 4px solid #f59e0b;
+                        ">
+                            <div style="
+                                display: flex;
+                                align-items: center;
+                                margin-bottom: 16px;
+                            ">
+                                <div style="
+                                    background: #f59e0b;
+                                    border-radius: 8px;
+                                    padding: 8px;
+                                    margin-right: 12px;
+                                ">
+                                    <svg style="width: 18px; height: 18px;" fill="white" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+                                    </svg>
+                                </div>
+                                <div style="
+                                    font-size: 14px;
+                                    font-weight: 600;
+                                    color: #374151;
+                                    font-family: 'Poppins', sans-serif;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                ">Transfer Route</div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 16px;">
+                                <div style="flex: 1;">
+                                    <div style="
+                                        font-size: 12px;
+                                        color: #6b7280;
+                                        margin-bottom: 4px;
+                                        font-family: 'Poppins', sans-serif;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                    ">From</div>
+                                    <div style="
+                                        font-size: 16px;
+                                        font-weight: 600;
+                                        color: #374151;
+                                        font-family: 'Poppins', sans-serif;
+                                    ">${booking.from}</div>
+                                </div>
+                                <div style="
+                                    background: #f59e0b;
+                                    border-radius: 50%;
+                                    padding: 8px;
+                                ">
+                                    <svg style="width: 16px; height: 16px;" fill="white" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10.293 15.707a1 1 0 010-1.414L14.586 10l-4.293-4.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                </div>
+                                <div style="flex: 1; text-align: right;">
+                                    <div style="
+                                        font-size: 12px;
+                                        color: #6b7280;
+                                        margin-bottom: 4px;
+                                        font-family: 'Poppins', sans-serif;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                    ">To</div>
+                                    <div style="
+                                        font-size: 16px;
+                                        font-weight: 600;
+                                        color: #374151;
+                                        font-family: 'Poppins', sans-serif;
+                                    ">${booking.to}</div>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- Additional Information -->
+                        <div style="
+                            display: grid;
+                            grid-template-columns: 1fr 1fr;
+                            gap: 20px;
+                            margin-bottom: 24px;
+                        ">
+                            <!-- Service Type -->
+                            <div style="
+                                background: #f0f9ff;
+                                border-radius: 10px;
+                                padding: 16px;
+                                border-left: 3px solid #0ea5e9;
+                            ">
+                                <div style="
+                                    font-size: 12px;
+                                    color: #0ea5e9;
+                                    margin-bottom: 6px;
+                                    font-family: 'Poppins', sans-serif;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    font-weight: 600;
+                                ">Service Type</div>
+                                <div style="
+                                    font-size: 15px;
+                                    font-weight: 600;
+                                    color: #374151;
+                                    font-family: 'Poppins', sans-serif;
+                                ">${booking.packageType === 'tour' ? 'Tour Package' : 'Transfer Service'}</div>
+                            </div>
+
+                            ${booking.pickupLocation ? `
+                            <!-- Pickup Location -->
+                            <div style="
+                                background: #f0fdf4;
+                                border-radius: 10px;
+                                padding: 16px;
+                                border-left: 3px solid #22c55e;
+                            ">
+                                <div style="
+                                    font-size: 12px;
+                                    color: #22c55e;
+                                    margin-bottom: 6px;
+                                    font-family: 'Poppins', sans-serif;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    font-weight: 600;
+                                ">Pickup Location</div>
+                                <div style="
+                                    font-size: 15px;
+                                    font-weight: 600;
+                                    color: #374151;
+                                    font-family: 'Poppins', sans-serif;
+                                    line-height: 1.4;
+                                ">${booking.pickupLocation}</div>
+                            </div>
+                            ` : `
+                            <div></div>
+                            `}
+                            
+                            <!-- Customer Name -->
+                            <div style="
+                                background: #fff7ed;
+                                border-radius: 10px;
+                                padding: 16px;
+                                border-left: 3px solid #f97316;
+                            ">
+                                <div style="
+                                    font-size: 12px;
+                                    color: #f97316;
+                                    margin-bottom: 6px;
+                                    font-family: 'Poppins', sans-serif;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    font-weight: 600;
+                                ">Customer</div>
+                                <div style="
+                                    font-size: 15px;
+                                    font-weight: 600;
+                                    color: #374151;
+                                    font-family: 'Poppins', sans-serif;
+                                ">${booking.customerName}</div>
+                            </div>
+                        </div>
+
+                        <!-- Payment Summary -->
+                        <div style="
+                            background: linear-gradient(135deg, #0C7157 0%, #0a5d4a 100%);
+                            border-radius: 12px;
+                            padding: 24px;
+                            color: white;
+                        ">
+                            <div style="
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                            ">
+                                <div style="
+                                    display: flex;
+                                    align-items: center;
+                                ">
+                                    <div style="
+                                        background: rgba(255, 255, 255, 0.2);
+                                        border-radius: 8px;
+                                        padding: 8px;
+                                        margin-right: 12px;
+                                    ">
+                                        <svg style="width: 20px; height: 20px;" fill="white" viewBox="0 0 20 20">
+                                            <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div style="
+                                            font-size: 16px;
+                                            font-weight: 600;
+                                            font-family: 'Poppins', sans-serif;
+                                            opacity: 0.9;
+                                        ">Total Amount Paid</div>
+                                        <div style="
+                                            font-size: 12px;
+                                            opacity: 0.7;
+                                            font-family: 'Poppins', sans-serif;
+                                        ">Payment confirmed</div>
+                                    </div>
+                                </div>
+                                <div style="
+                                    font-size: 28px;
+                                    font-weight: 700;
+                                    font-family: 'Poppins', sans-serif;
+                                    text-align: right;
+                                ">${booking.currency} ${booking.total.toFixed(2)}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -460,7 +768,7 @@ export class EmailService {
                 </div>
 
                 <p class="email-text" style="margin-top: 30px; color: #444;">
-                    If you have any questions or need to make changes to your booking, please don't hesitate to contact us. We're here to make your experience unforgettable!
+                    If you have any questions please don't hesitate to contact us. We're here to make your experience unforgettable!
                 </p>
 
                 <p class="email-text" style="margin-top: 20px; color: #0C7157; font-weight: 600;">
@@ -483,7 +791,7 @@ export class EmailService {
                         </svg>
                         Email
                     </a>
-                    <a href="tel:${emailConfig.templates.supportPhone}">
+                    <a href="http://wa.me/60196592141">
                         <svg class="icon" style="width: 16px; height: 16px; margin-right: 4px;" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
                         </svg>
@@ -708,6 +1016,7 @@ export class EmailService {
                 
                 ${bookingRows}
 
+                <!-- Use safer spacing for totals to avoid horizontal overflow in mail clients -->
                 <div class="total-row">
                     <span class="detail-label">
                         <svg style="width: 20px; height: 20px; margin-right: 8px;" fill="currentColor" viewBox="0 0 20 20">
@@ -736,7 +1045,7 @@ export class EmailService {
                 </div>
 
                 <p class="email-text" style="margin-top: 30px; color: #444;">
-                    If you have any questions or need to make changes to any of your bookings, please don't hesitate to contact us. We're here to make all your experiences unforgettable!
+                    If you have any questions please don't hesitate to contact us. We're here to make your experience unforgettable!
                 </p>
 
                 <p class="email-text" style="margin-top: 20px; color: #0C7157; font-weight: 600;">

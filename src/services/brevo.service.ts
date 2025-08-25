@@ -294,11 +294,25 @@ export class BrevoEmailService {
             .header p { font-family: 'Poppins', sans-serif; font-size: 16px; opacity: 0.95; font-weight: 400; }
             .content { padding: 40px 30px; }
             .greeting { font-family: 'Poppins', sans-serif; font-size: 18px; color: #0C7157; margin-bottom: 20px; font-weight: 600; }
-            .booking-details { background: #f9f9f9; border-radius: 8px; padding: 20px; margin: 20px 0; }
-            .detail-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; }
-            .detail-row:last-child { border-bottom: none; }
-            .detail-label { font-family: 'Poppins', sans-serif; font-weight: 500; color: #444; }
-            .detail-value { font-family: 'Poppins', sans-serif; color: #0C7157; font-weight: 600; }
+            /* Booking details improvements */
+            .booking-details { background: #ffffff; border-radius: 10px; padding: 0; margin: 20px 0; border: 1px solid #e6e9eb; overflow: hidden; }
+            .booking-header { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:18px 20px; background: linear-gradient(90deg, rgba(12,113,87,0.03), rgba(12,113,87,0.02)); }
+            .booking-header-left { flex:1; }
+            .package-title { font-size:18px; font-weight:700; color:#0C7157; margin-bottom:6px; }
+            .booking-ref { color:#6b7280; font-size:13px; }
+            .amount-badge { text-align:right; min-width:130px; }
+            .amount-badge .label { font-size:12px; color:rgba(255,255,255,0.9); text-transform:uppercase; letter-spacing:0.6px; }
+            .amount-badge .amount { font-size:20px; font-weight:800; color:#0C7157; background: #e8faf5; padding:10px 12px; border-radius:8px; display:inline-block; }
+            .booking-footer { padding: 12px 20px 20px; display:flex; justify-content:flex-end; align-items:center; }
+            .booking-footer .paid { font-size:12px; color:#6b7280; margin-right:12px; }
+            .booking-footer .total { font-size:20px; font-weight:800; color:#0C7157; }
+            .booking-body { padding: 16px 20px 20px 20px; background: #f9fafb; }
+            /* make each detail row span full width so label is left and value is right */
+            /* Use table layout for maximum email-client compatibility */
+            .details-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+            .details-table td.label { width: 48%; padding: 8px 0; font-family: 'Poppins', sans-serif; font-weight: 600; color: #374151; font-size:13px; vertical-align: top; }
+            .details-table td.value { width: 52%; padding: 8px 0; font-family: 'Poppins', sans-serif; color: #0C7157; font-weight: 700; font-size:13px; text-align: right; vertical-align: top; }
+            .details-table tr + tr td { border-top: 1px solid #eef2f4; }
             .total-row { background: #0C7157; color: #fff; margin: 15px -20px -20px -20px; padding: 18px 20px; border-radius: 0 0 8px 8px; display: flex; justify-content: space-between; align-items: center; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
             .info-box { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 25px 0; }
             .footer { background: #222; color: #fff; padding: 30px; text-align: center; border-radius: 0 0 12px 12px; }
@@ -326,66 +340,64 @@ export class BrevoEmailService {
                 <div class="greeting">Hello ${booking.customerName}!</div>
                 <p class="email-text">Thank you for choosing ${emailConfig.from.name}! We're excited to confirm your booking for an amazing experience.</p>
 
-                <div class="booking-details" style="padding-top: 10px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-                        <div>
-                            <div style="font-size:18px; font-weight:700; color:#0C7157; margin-bottom:6px;">${booking.packageName}</div>
-                            <div style="color:#666; font-size:13px;">Booking ID: <strong>#${booking.bookingId.slice(-8).toUpperCase()}</strong></div>
-                        </div>
-                        <div style="text-align:right;">
-                            <div style="background: #0C7157; color: white; padding: 8px 12px; border-radius: 8px; display: inline-block; min-width: 100px;">
-                                <div style="font-size:12px; opacity:0.9;">Amount</div>
-                                <div style="font-size:18px; font-weight:700;">${booking.currency} ${booking.total.toFixed(2)}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="margin-top:14px; background:#f9f9f9; padding:14px; border-radius:8px;">
-                        <div class="detail-row">
-                            <span class="detail-label">Date:</span>
-                            <span class="detail-value">${formatDate(booking.date)}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Time:</span>
-                            <span class="detail-value">${formatTime(booking.time)}</span>
-                        </div>
-                        ${booking.packageType === 'transfer' && booking.from && booking.to ? `
-                        <div class="detail-row">
-                            <span class="detail-label">From:</span>
-                            <span class="detail-value">${booking.from}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">To:</span>
-                            <span class="detail-value">${booking.to}</span>
-                        </div>
-                        ` : ''}
-                        <div class="detail-row">
-                            <span class="detail-label">Adults:</span>
-                            <span class="detail-value">${booking.adults}</span>
-                        </div>
-                        ${booking.children > 0 ? `
-                        <div class="detail-row">
-                            <span class="detail-label">Children:</span>
-                            <span class="detail-value">${booking.children}</span>
-                        </div>
-                        ` : ''}
-                        <div class="detail-row">
-                            <span class="detail-label">Type:</span>
-                            <span class="detail-value">${booking.packageType === 'tour' ? 'Tour Package' : 'Transfer Service'}</span>
-                        </div>
-                        ${booking.pickupLocation ? `
-                        <div class="detail-row">
-                            <span class="detail-label">Pickup:</span>
-                            <span class="detail-value">${booking.pickupLocation}</span>
-                        </div>
-                        ` : ''}
-                    </div>
-                    
-                    <div class="detail-row total-row" style="margin-top:18px;">
-                        <span class="detail-label">Total Amount:</span>
-                        <span class="detail-value">${booking.currency} ${booking.total.toFixed(2)}</span>
-                    </div>
-                </div>
+        <div class="booking-details">
+          <div class="booking-header">
+            <div class="booking-header-left">
+              <div class="package-title">${booking.packageName}</div>
+              <div class="booking-ref">Booking ID: <strong>#${booking.bookingId.slice(-8).toUpperCase()}</strong></div>
+            </div>
+          </div>
+            <div class="booking-body">
+            <table class="details-table" role="presentation">
+              <tr>
+                <td class="label">Customer</td>
+                <td class="value">${booking.customerName}</td>
+              </tr>
+              <tr>
+                <td class="label">Date</td>
+                <td class="value">${formatDate(booking.date)}</td>
+              </tr>
+              <tr>
+                <td class="label">Time</td>
+                <td class="value">${formatTime(booking.time)}</td>
+              </tr>
+              ${booking.packageType === 'transfer' && booking.from && booking.to ? `
+              <tr>
+                <td class="label">From</td>
+                <td class="value">${booking.from}</td>
+              </tr>
+              <tr>
+                <td class="label">To</td>
+                <td class="value">${booking.to}</td>
+              </tr>
+              ` : ''}
+              <tr>
+                <td class="label">Adults</td>
+                <td class="value">${booking.adults}</td>
+              </tr>
+              ${booking.children > 0 ? `
+              <tr>
+                <td class="label">Children</td>
+                <td class="value">${booking.children}</td>
+              </tr>
+              ` : ''}
+              <tr>
+                <td class="label">Service Type</td>
+                <td class="value">${booking.packageType === 'tour' ? 'Tour Package' : 'Transfer Service'}</td>
+              </tr>
+              ${booking.pickupLocation ? `
+              <tr>
+                <td class="label">Pickup</td>
+                <td class="value">${booking.pickupLocation}</td>
+              </tr>
+              ` : ''}
+            </table>
+          </div>
+          <div class="booking-footer">
+            <div class="paid">Paid online</div>
+            <div class="total">${booking.currency} ${booking.total.toFixed(2)}</div>
+          </div>
+        </div>
 
                 <div class="info-box">
                     <h3 style="color: #8c7a00; margin-bottom: 10px; font-weight: 600;">Important Information:</h3>
@@ -398,7 +410,7 @@ export class BrevoEmailService {
                 </div>
 
                 <p class="email-text" style="margin-top: 30px; color: #444;">
-                    If you have any questions or need to make changes to your booking, please don't hesitate to contact us. We're here to make your experience unforgettable!
+                    If you have any questions please don't hesitate to contact us. We're here to make your experience unforgettable!
                 </p>
 
                 <p class="email-text" style="margin-top: 20px; color: #0C7157; font-weight: 600;">
@@ -411,7 +423,7 @@ export class BrevoEmailService {
                 <p>Your trusted travel partner</p>
                 <div style="margin: 15px 0;">
                     <a href="mailto:${emailConfig.templates.supportEmail}">Email</a> |
-                    <a href="tel:${emailConfig.templates.supportPhone}">Call</a> |
+                    <a href="http://wa.me/60196592141">Call</a> |
                     <a href="${emailConfig.templates.website}">Website</a>
                 </div>
                 <p style="font-size: 12px; color: #bbb; margin-top: 20px;">
@@ -567,7 +579,7 @@ export class BrevoEmailService {
                 </div>
 
                 <p style="margin-top: 30px; color: #444;">
-                    If you have any questions or need to make changes to your bookings, please don't hesitate to contact us. We're here to make your experiences unforgettable!
+                    If you have any questions please don't hesitate to contact us. We're here to make your experience unforgettable!
                 </p>
 
                 <p style="margin-top: 20px; color: #0C7157; font-weight: 600;">
