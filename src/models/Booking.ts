@@ -28,7 +28,7 @@ export interface Booking extends Document {
   adults: number;
   children: number;
   pickupLocation: string;
-  status: "pending" | "confirmed" | "cancelled";
+  status: "pending" | "confirmed" | "cancelled" | "completed";
   firstBookingMinimum: boolean;
   contactInfo: ContactInfo;
   paymentInfo: PaymentInfo;
@@ -56,7 +56,7 @@ const BookingSchema: Schema = new Schema(
     adults: { type: Number, required: true, min: 1 },
     children: { type: Number, required: true, min: 0 },
     pickupLocation: { type: String, required: true },
-    status: { type: String, enum: ["pending", "confirmed", "cancelled"], default: "pending" },
+  status: { type: String, enum: ["pending", "confirmed", "cancelled", "completed"], default: "pending" },
     firstBookingMinimum: { type: Boolean, default: false },
     contactInfo: {
       name: { type: String, required: true },

@@ -4,6 +4,26 @@ import { TimeSlotService } from "./timeSlot.service";
 import mongoose from "mongoose";
 
 class BookingService {
+  // Mark confirmed bookings as completed if their date/time is in the past
+  private async markPastBookingsCompleted(additionalFilter: any = {}) {
+    try {
+      const now = new Date();
+      // Find bookings that are confirmed and whose date is before today (end of that day)
+      const bookingsToComplete = await BookingModel.find({
+        status: 'confirmed',
+        ...additionalFilter,
+        date: { $lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) }
+      }).select('_id');
+
+      if (bookingsToComplete.length === 0) return;
+
+      const ids = bookingsToComplete.map(b => b._id);
+      await BookingModel.updateMany({ _id: { $in: ids } }, { $set: { status: 'completed' } });
+      console.log(`✅ Marked ${ids.length} booking(s) as completed`);
+    } catch (err) {
+      console.error('Error marking past bookings completed:', err);
+    }
+  }
   // Create a new booking directly with contact info (for guests)
   async createBookingDirect(data: {
     packageType: "tour" | "transfer";
@@ -199,6 +219,9 @@ class BookingService {
     // Copy all filter properties to query
     Object.assign(query, filter);
 
+  // Ensure past confirmed bookings are updated to completed before returning lists
+  await this.markPastBookingsCompleted(filter);
+
     // Populate packageId based on packageType
     const bookings = await BookingModel.find(query)
       .sort({ createdAt: -1 })
@@ -225,6 +248,9 @@ class BookingService {
     
     // Copy all filter properties to query
     Object.assign(query, filter);
+
+  // Ensure past confirmed bookings are updated to completed before returning lists
+  await this.markPastBookingsCompleted(filter);
 
     // Get bookings first
     const bookings = await BookingModel.find(query)

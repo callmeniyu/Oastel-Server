@@ -380,6 +380,10 @@ export class BrevoEmailService {
                 <td class="label">Children</td>
                 <td class="value">${booking.children}</td>
               </tr>
+              <tr>
+                <td class="label" style="font-size:12px; color:#6b7280; font-weight:600; font-family: 'Poppins', sans-serif;">Age between 3 to 7 years</td>
+                <td class="value"></td>
+              </tr>
               ` : ''}
               <tr>
                 <td class="label">Service Type</td>

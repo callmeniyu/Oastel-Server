@@ -75,17 +75,24 @@ export const createTransfer = async (req: Request, res: Response) => {
 
         // Generate time slots for the transfer (90 days ahead)
         try {
-            // Determine capacity: for Private transfers prefer vehicle.units if available
-            let capacity = (transferData.seatCapacity && Number(transferData.seatCapacity)) || transferData.maximumPerson || 10
-            try {
-                if (transferData.type === "Private" && transferData.vehicle) {
+            // Determine capacity based on transfer type
+            let capacity
+            if (transferData.type === "Private" && transferData.vehicle) {
+                // For Private transfers: use vehicle.units (number of vehicles available)
+                try {
                     const vehicleDoc = await Vehicle.findOne({ name: transferData.vehicle }).lean()
                     if (vehicleDoc && typeof vehicleDoc.units === 'number') {
                         capacity = vehicleDoc.units
+                    } else {
+                        capacity = 1 // Default to 1 vehicle if vehicle not found
                     }
+                } catch (err) {
+                    console.warn('Failed to lookup vehicle for private transfer slot capacity, using default 1', err)
+                    capacity = 1
                 }
-            } catch (err) {
-                console.warn('Failed to lookup vehicle for slot capacity, falling back to seatCapacity/maximumPerson', err)
+            } else {
+                // For Non-Private transfers (Shared/Both): use maximumPerson (number of person seats)
+                capacity = transferData.maximumPerson || 10
             }
 
             await TimeSlotService.generateSlotsForPackage(
@@ -317,22 +324,43 @@ export const updateTransfer = async (req: Request, res: Response) => {
         // Update time slots if times or capacity changed
         try {
             const times = transferData.times || existingTransfer.times
-                // Use vehicle.units for private transfers when available; otherwise fall back to seatCapacity/maximumPerson
-                let capacity = (transferData.seatCapacity && Number(transferData.seatCapacity)) || transferData.maximumPerson || existingTransfer.maximumPerson || 10
+            // Determine capacity based on transfer type (same logic as creation)
+            let capacity
+            const transferType = transferData.type || existingTransfer.type
+            const vehicleName = transferData.vehicle || existingTransfer.vehicle
+            
+            if (transferType === "Private" && vehicleName) {
+                // For Private transfers: use vehicle.units (number of vehicles available)
                 try {
-                    if ((transferData.type === "Private" || existingTransfer.type === "Private") && (transferData.vehicle || existingTransfer.vehicle)) {
-                        const vehicleName = transferData.vehicle || existingTransfer.vehicle
-                        const vehicleDoc = await Vehicle.findOne({ name: vehicleName }).lean()
-                        if (vehicleDoc && typeof vehicleDoc.units === 'number') {
-                            capacity = vehicleDoc.units
-                        }
+                    const vehicleDoc = await Vehicle.findOne({ name: vehicleName }).lean()
+                    if (vehicleDoc && typeof vehicleDoc.units === 'number') {
+                        capacity = vehicleDoc.units
+                    } else {
+                        capacity = 1 // Default to 1 vehicle if vehicle not found
                     }
                 } catch (err) {
-                    console.warn('Failed to lookup vehicle for updated slot capacity, falling back to provided capacity', err)
+                    console.warn('Failed to lookup vehicle for private transfer update, using default 1', err)
+                    capacity = 1
                 }
+            } else {
+                // For Non-Private transfers (Shared/Both): use maximumPerson (number of person seats)
+                capacity = transferData.maximumPerson || existingTransfer.maximumPerson || 10
+            }
             
-            if (JSON.stringify(times) !== JSON.stringify(existingTransfer.times) || 
-                    capacity !== (existingTransfer.seatCapacity || existingTransfer.maximumPerson)) {
+            // Calculate existing capacity to compare for changes
+            let existingCapacity
+            if (existingTransfer.type === "Private" && existingTransfer.vehicle) {
+                try {
+                    const vehicleDoc = await Vehicle.findOne({ name: existingTransfer.vehicle }).lean()
+                    existingCapacity = (vehicleDoc && typeof vehicleDoc.units === 'number') ? vehicleDoc.units : 1
+                } catch (err) {
+                    existingCapacity = 1
+                }
+            } else {
+                existingCapacity = existingTransfer.maximumPerson || 10
+            }
+            
+            if (JSON.stringify(times) !== JSON.stringify(existingTransfer.times) || capacity !== existingCapacity) {
                 await TimeSlotService.updateSlotsForPackage(
                     "transfer",
                     transfer._id as Types.ObjectId,

@@ -101,17 +101,8 @@ export async function createBooking(req: Request, res: Response) {
       ...(isAdminBooking && { isAdminBooking: true })
     });
 
-    // Update slot booking count
-    slot.bookedCount += totalGuests;
-    if (slot.bookedCount >= slot.capacity) {
-      slot.isAvailable = false;
-    }
-    timeSlot.booked += totalGuests;
-    if (timeSlot.booked >= timeSlot.capacity) {
-      timeSlot.isAvailable = false;
-    }
-
-    await Promise.all([booking.save(), timeSlot.save()]);
+    // Save booking first (do not pre-update slot counts here)
+    await booking.save();
 
     // Update slot with proper minimum person logic using TimeSlotService
     try {
@@ -126,6 +117,24 @@ export async function createBooking(req: Request, res: Response) {
     } catch (updateError) {
       console.warn('Warning: TimeSlotService update failed:', updateError);
       // Don't fail the booking if slot service update fails
+    }
+
+    // Recompute and persist document-level aggregates (booked / isAvailable)
+    try {
+      const refreshedTimeSlot = await TimeSlot.findOne({
+        packageId: new Types.ObjectId(packageId),
+        packageType,
+        date
+      });
+      if (refreshedTimeSlot) {
+        // Aggregate booked count from individual slots
+        const aggregateBooked = refreshedTimeSlot.slots.reduce((sum, s) => sum + (s.bookedCount || 0), 0);
+        refreshedTimeSlot.booked = aggregateBooked;
+        refreshedTimeSlot.isAvailable = aggregateBooked < (refreshedTimeSlot.capacity || 0);
+        await refreshedTimeSlot.save();
+      }
+    } catch (aggError) {
+      console.warn('Warning: Failed to recompute timeSlot aggregates:', aggError);
     }
 
     return res.status(201).json({

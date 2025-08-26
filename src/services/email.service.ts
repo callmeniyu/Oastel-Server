@@ -520,8 +520,18 @@ export class EmailService {
                                             color: #6b7280;
                                             font-family: 'Poppins', sans-serif;
                                         ">Child${booking.children > 1 ? 'ren' : ''}</div>
+                                        <div style="font-size:12px; color:#6b7280; margin-top:6px;">Age between 3 to 7 years</div>
                                     </div>
                                     ` : ''}
+                                </div>
+                                ${booking.children > 0 ? `
+                                <div style="display:flex; gap:16px; margin-top:8px;">
+                                    <div style="flex:1;">
+                                        <div style="font-size:12px; font-weight:600; color:#6b7280;">Age between 3 to 7 years</div>
+                                    </div>
+                                    <div style="flex:1;"></div>
+                                </div>
+                                ` : ''}
                                 </div>
                             </div>
                         </div>
@@ -900,6 +910,17 @@ export class EmailService {
                                             <div><strong>Date:</strong> ${formattedDate}</div>
                                             <div style="margin-top:4px;"><strong>Time:</strong> ${formattedTime}</div>
                                             <div style="margin-top:4px;"><strong>Guests:</strong> ${booking.adults} adult${booking.adults > 1 ? 's' : ''}${booking.children > 0 ? `, ${booking.children} child${booking.children > 1 ? 'ren' : ''}` : ''}</div>
+                                            ${booking.children > 0 ? `</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="width: 50%; padding: 6px 8px; vertical-align: top; color: #444; font-size: 13px;">
+                                                <div style="font-size:12px; font-weight:600; color:#6b7280;">Age between 3 to 7 years</div>
+                                            </td>
+                                            <td style="width: 50%; padding: 6px 8px; vertical-align: top; color: #444; font-size: 13px;">
+                                            </td>
+                                        </tr>
+                                        ` : ''}
                                         </td>
                                         <td style="width: 50%; padding: 6px 8px; vertical-align: top; color: #444; font-size: 13px;">
                                             ${booking.pickupLocation ? `<div><strong>Pickup:</strong> ${booking.pickupLocation}</div>` : ''}
