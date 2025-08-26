@@ -39,10 +39,17 @@ class BookingController {
       }
 
       // Create booking directly without userId for now
+      // Parse date as local midnight to avoid timezone offset issues (treat incoming YYYY-MM-DD as local date)
+      // Parse incoming YYYY-MM-DD as UTC midday to avoid timezone shift when
+      // converting to ISO date strings later (prevents off-by-one day issues)
+      const parsedDateForBooking = typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? new Date(date + 'T12:00:00.000Z')
+        : new Date(date);
+
       const booking = await BookingService.createBookingDirect({
         packageType,
         packageId: new mongoose.Types.ObjectId(packageId),
-        date: new Date(date),
+        date: parsedDateForBooking,
         time,
         adults: adultsCount,
         children: children || 0,
@@ -134,21 +141,26 @@ class BookingController {
       // Handle date filtering
       if (req.query.date) {
         const dateStr = req.query.date as string;
-        const startDate = new Date(dateStr);
-        const endDate = new Date(dateStr);
+        // Treat incoming date string as local date (YYYY-MM-DD) at midnight
+        const startDate = /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
+          ? new Date(dateStr + 'T00:00:00')
+          : new Date(dateStr);
+        const endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + 1);
         filter.date = {
           $gte: startDate,
-          $lt: endDate
+          $lt: endDate,
         };
       }
 
       // Handle beforeDate filtering (for booking history)
       if (req.query.beforeDate) {
         const beforeDateStr = req.query.beforeDate as string;
-        const beforeDate = new Date(beforeDateStr);
+        const beforeDate = /^\d{4}-\d{2}-\d{2}$/.test(beforeDateStr)
+          ? new Date(beforeDateStr + 'T00:00:00')
+          : new Date(beforeDateStr);
         filter.date = {
-          $lt: beforeDate
+          $lt: beforeDate,
         };
       }
 

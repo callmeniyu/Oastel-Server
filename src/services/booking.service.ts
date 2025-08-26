@@ -49,10 +49,15 @@ class BookingService {
       // Check slot availability using TimeSlotService (includes minimum person validation)
       // For vehicle bookings, requestedPersons should be treated as 1 (one vehicle)
       const requestedPersons = data.isVehicleBooking ? 1 : totalGuests;
+      // Ensure we use Malaysia-local date string for slot lookups (avoid UTC shift)
+      const slotDateStr = TimeSlotService.formatDateToMalaysiaTimezone(
+        data.date.toISOString().split('T')[0]
+      );
+
       const availability = await TimeSlotService.checkAvailability(
         data.packageType,
         data.packageId,
-        data.date.toISOString().split('T')[0],
+        slotDateStr,
         data.time,
         requestedPersons
       );
@@ -92,9 +97,9 @@ class BookingService {
         await TimeSlotService.updateSlotBooking(
           data.packageType,
           data.packageId,
-          data.date.toISOString().split('T')[0],
+          slotDateStr,
           data.time,
-      1, // one vehicle
+          1, // one vehicle
           "add"
         );
         const TransferModel = mongoose.model('Transfer');
@@ -108,9 +113,9 @@ class BookingService {
         await TimeSlotService.updateSlotBooking(
           data.packageType,
           data.packageId,
-          data.date.toISOString().split('T')[0],
+          slotDateStr,
           data.time,
-      totalGuests,
+          totalGuests,
           "add"
         );
         if (data.packageType === 'tour') {
