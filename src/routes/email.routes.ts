@@ -243,4 +243,64 @@ router.get('/status', (req, res) => {
   }
 });
 
+/**
+ * POST /api/email/feedback
+ * Body: { name, email, message }
+ */
+router.post('/feedback', async (req, res) => {
+  try {
+    const { name, email, message } = req.body || {};
+
+    if (!name || !email || !message) {
+      return res.status(400).json({ success: false, message: 'name, email and message are required' });
+    }
+
+    // Validate name
+    if (typeof name !== 'string' || name.trim().length < 2) {
+      return res.status(400).json({ success: false, message: 'Name must be at least 2 characters long' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (typeof email !== 'string' || !emailRegex.test(email.trim())) {
+      return res.status(400).json({ success: false, message: 'A valid email address is required' });
+    }
+
+    // Basic validation: message length
+    if (typeof message !== 'string' || message.trim().length < 100) {
+      return res.status(400).json({ success: false, message: 'Message must be at least 100 characters long' });
+    }
+
+    const toEmail = process.env.FEEDBACK_TO_EMAIL || 'oastel.com@gmail.com';
+
+    // Prefer Brevo if configured
+    let sent = false;
+    if (process.env.BREVO_API_KEY) {
+      sent = await BrevoEmailService.sendFeedback(toEmail, name.trim(), email.trim(), message.trim());
+    } else {
+      // Fallback: use EmailService (SMTP)
+      const emailService = new EmailService();
+      // Reuse the SMTP transporter via a minimal mail: we'll compose simple HTML
+      const feedbackData = {
+        senderName: name.trim(),
+        senderEmail: email.trim(),
+        message: message.trim(),
+      } as any;
+
+      // If EmailService had a feedback method, we'd call it. For now use Brevo logic through BrevoEmailService if available.
+      sent = await BrevoEmailService.sendFeedback(toEmail, feedbackData.senderName, feedbackData.senderEmail, feedbackData.message);
+    }
+
+    if (sent) {
+      return res.json({ success: true, message: 'Feedback sent successfully' });
+    } else {
+      return res.status(500).json({ success: false, message: 'Failed to send feedback' });
+    }
+  } catch (error) {
+    console.error('Error in feedback endpoint:', error);
+    res.status(500).json({ success: false, message: 'Internal server error', error: error instanceof Error ? error.message : 'Unknown error' });
+  }
+});
+
 export default router;
+

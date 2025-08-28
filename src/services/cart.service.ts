@@ -48,7 +48,7 @@ export class CartService {
 
       // Get package details with minimal fields for performance
       let packageDoc: any;
-      const selectFields = 'title image images newPrice price';
+      const selectFields = 'title image images newPrice price type vehicle seatCapacity';
       
       if (item.packageType === 'tour') {
         packageDoc = await Tour.findById(item.packageId).select(selectFields).lean();
@@ -77,7 +77,11 @@ export class CartService {
         children: item.children,
         pickupLocation: item.pickupLocation || '',
         totalPrice: totalPrice,
-        addedAt: new Date()
+        addedAt: new Date(),
+        // Add vehicle information for private transfers
+        isVehicleBooking: item.packageType === 'transfer' && packageDoc.type === 'Private',
+        vehicleName: item.packageType === 'transfer' && packageDoc.type === 'Private' ? packageDoc.vehicle : undefined,
+        vehicleSeatCapacity: item.packageType === 'transfer' && packageDoc.type === 'Private' ? packageDoc.seatCapacity : undefined
       };
 
       // Check if item already exists (same package, date, time)

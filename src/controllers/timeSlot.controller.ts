@@ -450,6 +450,8 @@ export const getServerDateTime = async (req: Request, res: Response) => {
     try {
         // Get current time in Malaysia timezone
         const now = new Date();
+        
+        // Get Malaysia date without any parsing issues
         const malaysiaDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }); // YYYY-MM-DD
         const malaysiaTime = now.toLocaleTimeString('en-US', {
             hour: '2-digit',
@@ -457,14 +459,24 @@ export const getServerDateTime = async (req: Request, res: Response) => {
             hour12: true,
             timeZone: 'Asia/Kuala_Lumpur'
         });
-        const malaysiaFullDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
+        
+        // Get Malaysia long date format
+        const malaysiaLongDate = now.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            timeZone: 'Asia/Kuala_Lumpur'
+        });
 
         res.json({
             success: true,
             data: {
                 date: malaysiaDate,
                 time: malaysiaTime,
-                fullDateTime: malaysiaFullDate.toISOString()
+                longDate: malaysiaLongDate,
+                // Send the raw date string to avoid client-side timezone conversion issues
+                fullDateTime: malaysiaDate + 'T00:00:00.000Z'
             }
         });
     } catch (error: any) {

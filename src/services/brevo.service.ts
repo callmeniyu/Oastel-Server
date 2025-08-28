@@ -235,6 +235,76 @@ export class BrevoEmailService {
   }
 
   /**
+   * Send feedback/contact email to site owner
+   */
+  static async sendFeedback(toEmail: string, senderName: string, senderEmail: string, message: string): Promise<boolean> {
+    try {
+      if (!this.API_KEY) {
+        console.error('❌ BREVO_API_KEY is not set in environment variables');
+        return false;
+      }
+
+      console.log('📧 Sending feedback email via Brevo API...');
+      console.log('From:', senderEmail, 'Name:', senderName);
+
+      const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>New Feedback</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; color: #222;">
+        <div style="max-width:600px;margin:0 auto;padding:20px;background:#fff;border-radius:8px;">
+          <h2 style="color:#0C7157">New Feedback Received</h2>
+          <p><strong>From:</strong> ${senderName} &lt;${senderEmail}&gt;</p>
+          <hr />
+          <h3>Message</h3>
+          <p style="white-space: pre-wrap;">${message}</p>
+          <hr />
+          <p>Sent on: ${new Date().toLocaleString()}</p>
+        </div>
+      </body>
+      </html>
+      `;
+
+      const payload = {
+        sender: {
+          name: emailConfig.from.name,
+          email: emailConfig.from.email,
+        },
+        to: [{ email: toEmail }],
+        subject: `📩 Website Feedback from ${senderName}`,
+        htmlContent: html,
+      };
+
+      const response = await fetch(this.API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': this.API_KEY,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error('❌ Brevo API error:', response.status, errorBody);
+        return false;
+      }
+
+      const result = await response.json();
+      console.log('✅ Feedback email sent successfully via Brevo');
+      console.log('Message ID:', result.messageId);
+      return true;
+    } catch (error) {
+      console.error('❌ Error sending feedback email via Brevo:', error);
+      return false;
+    }
+  }
+
+  /**
    * Generate booking confirmation HTML - reusing the existing template
    */
   private static generateBookingConfirmationHTML(booking: BookingEmailData): string {
@@ -371,6 +441,16 @@ export class BrevoEmailService {
                 <td class="value">${booking.to}</td>
               </tr>
               ` : ''}
+              ${booking.isVehicleBooking ? `
+              <tr>
+                <td class="label">Vehicle</td>
+                <td class="value">${booking.vehicleName || 'Private Vehicle'}</td>
+              </tr>
+              <tr>
+                <td class="label">Seat Capacity</td>
+                <td class="value">${booking.vehicleSeatCapacity || 'N/A'} seats</td>
+              </tr>
+              ` : `
               <tr>
                 <td class="label">Adults</td>
                 <td class="value">${booking.adults}</td>
@@ -385,6 +465,7 @@ export class BrevoEmailService {
                 <td class="value"></td>
               </tr>
               ` : ''}
+              `}
               <tr>
                 <td class="label">Service Type</td>
                 <td class="value">${booking.packageType === 'tour' ? 'Tour Package' : 'Transfer Service'}</td>
@@ -415,7 +496,7 @@ export class BrevoEmailService {
                 <li>No refund, cancellation, or date change within 72 hours.</li>
               </ul>
             </li>
-            <li>Bring enough cash for entrance fees and food.</li>
+            <li>Entrance fees and all food and beverages are not included in the package price.</li>
             <li>Luggage and large backpacks cannot be brought on the tour.</li>
             <li>Views depend on the weather and cannot be guaranteed.</li>
           </ul>
@@ -488,7 +569,11 @@ export class BrevoEmailService {
     };
 
     const totalBookings = cartData.bookings.length;
-    const totalGuests = cartData.bookings.reduce((total, booking) => total + booking.adults + booking.children, 0);
+    // For cart email total guests, count vehicle bookings as 1 (one vehicle) instead of summing adults
+    const totalGuests = cartData.bookings.reduce((total, booking) => {
+      if (booking.isVehicleBooking) return total + 1;
+      return total + (booking.adults || 0) + (booking.children || 0);
+    }, 0);
 
     const bookingRows = cartData.bookings.map((booking, index) => {
       const formattedDate = booking.date ? formatDate(booking.date) : 'Invalid Date';
@@ -509,7 +594,12 @@ export class BrevoEmailService {
           <div style="color: #444; font-size: 14px;">
             <div><strong>Date:</strong> ${formattedDate}</div>
             <div><strong>Time:</strong> ${formattedTime}</div>
+            ${booking.isVehicleBooking ? `
+            <div><strong>Vehicle:</strong> ${booking.vehicleName || 'Private Vehicle'}</div>
+            <div><strong>Seat Capacity:</strong> ${booking.vehicleSeatCapacity || 'N/A'} seats</div>
+            ` : `
             <div><strong>Guests:</strong> ${booking.adults} adult${booking.adults > 1 ? 's' : ''}${booking.children > 0 ? `, ${booking.children} child${booking.children > 1 ? 'ren' : ''}` : ''}</div>
+            `}
             ${booking.pickupLocation ? `<div><strong>Pickup:</strong> ${booking.pickupLocation}</div>` : ''}
           </div>
         </div>
@@ -592,7 +682,7 @@ export class BrevoEmailService {
                 <li>No refund, cancellation, or date change within 72 hours.</li>
               </ul>
             </li>
-            <li>Bring enough cash for entrance fees and food.</li>
+            <li>Carry cash for entrance fees, as most entry points at the destination do not accept cards.</li>
             <li>Luggage and large backpacks cannot be brought on the tour.</li>
             <li>Views depend on the weather and cannot be guaranteed.</li>
           </ul>
@@ -652,24 +742,6 @@ export class BrevoEmailService {
     };
 
     return `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Share Your Experience</title>
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #222; background: #f6f6f6; }
-            .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 16px rgba(12,113,87,0.08); }
-            .header { background: linear-gradient(135deg, #0C7157, #0C7157); padding: 40px 30px; text-align: center; color: white; border-radius: 12px 12px 0 0; }
-            .content { padding: 40px 30px; }
-            .cta-button { display: inline-block; background: #0C7157; color: #fff; text-decoration: none; padding: 16px 36px; border-radius: 8px; font-weight: 600; margin: 24px 0; text-align: center; font-size: 18px; }
-            .footer { background: #222; color: #fff; padding: 30px; text-align: center; border-radius: 0 0 12px 12px; }
-        </style>
-    </head>
-    <body>
         <div class="container">
             <div class="header">
                 <div style="font-size: 32px; font-weight: 500; margin-bottom: 20px;">Oastel</div>

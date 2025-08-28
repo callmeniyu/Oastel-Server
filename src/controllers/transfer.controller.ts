@@ -63,6 +63,11 @@ export const createTransfer = async (req: Request, res: Response) => {
             })
         }
 
+        // For Private transfers, set minimumPerson to 1 (vehicle booking, not person-based)
+        if (transferData.type === "Private") {
+            transferData.minimumPerson = 1
+        }
+
         const transfer = new Transfer(transferData)
         const savedTransfer = await transfer.save()
         // Debug: log saved document vehicle to verify persistence
@@ -288,6 +293,11 @@ export const updateTransfer = async (req: Request, res: Response) => {
                 success: false,
                 message: "Vehicle name is required for Private transfers",
             })
+        }
+
+        // For Private transfers, set minimumPerson to 1 (vehicle booking, not person-based)
+        if (transferData.type === "Private") {
+            transferData.minimumPerson = 1
         }
 
         // Handle label - convert "None" to null

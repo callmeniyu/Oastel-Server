@@ -20,6 +20,10 @@ export interface BookingEmailData {
   pickupLocation?: string;
   total: number;
   currency: string;
+  // Private transfer vehicle details
+  isVehicleBooking?: boolean;
+  vehicleName?: string;
+  vehicleSeatCapacity?: number;
 }
 
 export interface CartBookingEmailData {
@@ -38,6 +42,10 @@ export interface CartBookingEmailData {
     children: number;
     pickupLocation?: string;
     total: number;
+    // Private transfer vehicle details
+    isVehicleBooking?: boolean;
+    vehicleName?: string;
+    vehicleSeatCapacity?: number;
   }>;
   totalAmount: number;
   currency: string;
@@ -779,7 +787,7 @@ export class EmailService {
                                 <li>No refund, cancellation, or date change within 72 hours.</li>
                             </ul>
                         </li>
-                        <li>Bring enough cash for entrance fees and food.</li>
+                        <li>Carry cash for entrance fees, as most entry points at the destination do not accept cards.</li>
                         <li>Luggage and large backpacks cannot be brought on the tour.</li>
                         <li>Views depend on the weather and cannot be guaranteed.</li>
                     </ul>

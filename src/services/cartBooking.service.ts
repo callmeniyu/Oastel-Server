@@ -310,7 +310,11 @@ export class CartBookingService {
                 adults: cartItem?.adults || 1,
                 children: cartItem?.children || 0,
                 pickupLocation: cartItem?.pickupLocation || '',
-                total
+                total,
+                // Add vehicle information for private transfers
+                isVehicleBooking: cartItem?.isVehicleBooking || false,
+                vehicleName: cartItem?.vehicleName,
+                vehicleSeatCapacity: cartItem?.vehicleSeatCapacity
               };
             }),
             totalAmount: cartItemsForEmail.reduce((sum: number, item: any) => {

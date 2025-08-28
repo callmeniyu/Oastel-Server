@@ -46,6 +46,18 @@ class BookingController {
         ? new Date(date + 'T12:00:00.000Z')
         : new Date(date);
 
+      // Get package details for checking vehicle capacity
+      let packageDetails: any = null;
+      if (packageType === 'tour') {
+        const mongoose = require('mongoose');
+        const TourModel = mongoose.model('Tour');
+        packageDetails = await TourModel.findById(packageId);
+      } else if (packageType === 'transfer') {
+        const mongoose = require('mongoose');
+        const TransferModel = mongoose.model('Transfer');
+        packageDetails = await TransferModel.findById(packageId);
+      }
+
       const booking = await BookingService.createBookingDirect({
         packageType,
         packageId: new mongoose.Types.ObjectId(packageId),
@@ -54,6 +66,7 @@ class BookingController {
         adults: adultsCount,
         children: children || 0,
         isVehicleBooking: !!isVehicleBooking,
+        vehicleSeatCapacity: isVehicleBooking && packageDetails ? packageDetails.seatCapacity : undefined,
         pickupLocation,
         contactInfo,
         subtotal: subtotal || total,
@@ -65,18 +78,6 @@ class BookingController {
           paymentStatus: "pending"
         }
       });
-
-      // Get package details for email
-      let packageDetails: any = null;
-      if (packageType === 'tour') {
-        const mongoose = require('mongoose');
-        const TourModel = mongoose.model('Tour');
-        packageDetails = await TourModel.findById(packageId);
-      } else if (packageType === 'transfer') {
-        const mongoose = require('mongoose');
-        const TransferModel = mongoose.model('Transfer');
-        packageDetails = await TransferModel.findById(packageId);
-      }
 
       // Send confirmation email to customer
       try {
@@ -101,6 +102,13 @@ class BookingController {
         if (packageType === 'transfer' && packageDetails) {
           (emailData as any).from = packageDetails.from;
           (emailData as any).to = packageDetails.to;
+          
+          // Add vehicle information for private transfers
+          if (packageDetails.type === 'Private') {
+            (emailData as any).isVehicleBooking = true;
+            (emailData as any).vehicleName = packageDetails.vehicle;
+            (emailData as any).vehicleSeatCapacity = packageDetails.seatCapacity;
+          }
         }
 
         await EmailService.sendBookingConfirmation(emailData);

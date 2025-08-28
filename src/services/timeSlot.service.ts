@@ -163,8 +163,9 @@ export class TimeSlotService {
             
             let requiredMinimum: number
             if (isPrivate) {
-                // For private packages, always use the original minimum person requirement
-                requiredMinimum = slot.minimumPerson
+                // For private packages (vehicle bookings), no minimum person requirement
+                // since booking is for the entire vehicle regardless of passenger count
+                requiredMinimum = 1
             } else {
                 // For non-private packages, use the actual minimumPerson field from database
                 // (which gets updated to 1 after first booking in updateSlotBooking)

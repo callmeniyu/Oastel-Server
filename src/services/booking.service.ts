@@ -47,7 +47,8 @@ class BookingService {
       currency: string;
       paymentStatus: string;
     };
-  isVehicleBooking?: boolean;
+    isVehicleBooking?: boolean;
+    vehicleSeatCapacity?: number;
   }): Promise<Booking> {
     try {
       // Get package details to check minimum person requirement
@@ -102,7 +103,9 @@ class BookingService {
         paymentInfo: data.paymentInfo,
         subtotal: data.subtotal,
         total: data.total,
-        firstBookingMinimum: false // Can be calculated based on business logic
+        firstBookingMinimum: false, // Can be calculated based on business logic
+        isVehicleBooking: data.isVehicleBooking || false,
+        vehicleSeatCapacity: data.vehicleSeatCapacity
       });
 
       const savedBooking = await booking.save();

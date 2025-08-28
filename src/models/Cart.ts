@@ -15,6 +15,10 @@ export interface ICartItem {
   pickupLocation?: string;
   totalPrice: number;
   addedAt: Date;
+  // Private transfer vehicle details
+  isVehicleBooking?: boolean;
+  vehicleName?: string;
+  vehicleSeatCapacity?: number;
 }
 
 // Interface for cart document
@@ -83,6 +87,17 @@ const CartItemSchema = new Schema<ICartItem>({
   addedAt: {
     type: Date,
     default: Date.now
+  },
+  // Private transfer vehicle details
+  isVehicleBooking: {
+    type: Boolean,
+    default: false
+  },
+  vehicleName: {
+    type: String
+  },
+  vehicleSeatCapacity: {
+    type: Number
   }
 }, { _id: true });
 

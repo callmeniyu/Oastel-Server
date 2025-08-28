@@ -28,7 +28,7 @@ export interface TourType extends Document {
     minimumPerson: number
     maximumPerson?: number
     departureTimes: string[] // e.g. ["08:00 AM","01:30 PM"]
-    label?: "Recommended" | "Popular" | "Best Value"
+    label?: "Recommended" | "Popular" | "Best Value" | "Best seller"
     details: TourDetails
     createdAt: Date
     updatedAt: Date
@@ -53,7 +53,7 @@ const TourSchema = new Schema<TourType>(
         minimumPerson: Number,
         maximumPerson: Number,
         departureTimes: [String],
-        label: { type: String, enum: ["Recommended", "Popular", "Best Value"], default: null },
+        label: { type: String, enum: ["Recommended", "Popular", "Best Value", "Best seller"], default: null },
         details: {
             about: String,
             itinerary: String,
