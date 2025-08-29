@@ -382,6 +382,59 @@ class BookingService {
     await booking.save();
     return booking;
   }
+
+  // Delete booking and adjust related time slot and package counts
+  async deleteBooking(id: string): Promise<boolean> {
+    const booking = await BookingModel.findById(id);
+    if (!booking) return false;
+
+    // If booking had a slotId or package info, adjust counts
+    try {
+      const packageType = booking.packageType;
+      const packageId = booking.packageId as any;
+
+      // For vehicle/private bookings treat as one vehicle when updating slots
+      const persons = booking.isVehicleBooking ? 1 : (booking.adults + booking.children);
+
+      // Format date string for TimeSlotService
+      const slotDateStr = TimeSlotService.formatDateToMalaysiaTimezone(
+        booking.date.toISOString().split('T')[0]
+      );
+
+      // Subtract booked count from time slot
+      try {
+        await TimeSlotService.updateSlotBooking(
+          packageType as 'tour' | 'transfer',
+          packageId,
+          slotDateStr,
+          booking.time,
+          persons,
+          'subtract'
+        );
+      } catch (slotErr) {
+        console.error('Failed to update time slot when deleting booking:', slotErr);
+        // proceed with deletion even if slot update fails
+      }
+
+      // Decrement package bookedCount if applicable
+      try {
+        const mongoose = require('mongoose');
+        const PackageModel = packageType === 'tour' ? mongoose.model('Tour') : mongoose.model('Transfer');
+        if (PackageModel) {
+          await PackageModel.findByIdAndUpdate(packageId, { $inc: { bookedCount: -persons } });
+        }
+      } catch (pkgErr) {
+        console.error('Failed to update package bookedCount when deleting booking:', pkgErr);
+      }
+
+      // Finally delete the booking
+      await BookingModel.findByIdAndDelete(id);
+      return true;
+    } catch (error) {
+      console.error('Error deleting booking in service:', error);
+      throw error;
+    }
+  }
 }
 
 export default new BookingService();

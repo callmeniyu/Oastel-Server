@@ -264,6 +264,27 @@ class BookingController {
       res.status(400).json({ error: error.message });
     }
   }
+
+  // Delete booking
+  async deleteBooking(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'Booking ID is required' });
+      }
+
+      const result = await BookingService.deleteBooking(id);
+
+      if (!result) {
+        return res.status(404).json({ success: false, error: 'Booking not found' });
+      }
+
+      res.json({ success: true, message: 'Booking deleted successfully' });
+    } catch (error: any) {
+      console.error('Error deleting booking:', error);
+      res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+    }
+  }
 }
 
 export default new BookingController();

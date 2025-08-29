@@ -11,5 +11,8 @@ router.get("/", BookingController.getBookings);
 router.get("/:id", BookingController.getBookingById);
 router.put("/:id", BookingController.updateBooking);
 router.post("/:id/payment-confirm", BookingController.confirmPayment);
+// Delete a booking
+// `deleteBooking` was added to the controller; cast to any to avoid a transient TS error
+router.delete("/:id", (BookingController as any).deleteBooking);
 
 export default router;
