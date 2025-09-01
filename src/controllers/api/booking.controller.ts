@@ -3,6 +3,7 @@ import Booking from '../../models/Booking';
 import TimeSlot from '../../models/TimeSlot';
 import { Types } from 'mongoose';
 import { TimeSlotService } from '../../services/timeSlot.service';
+import EmailService from '../../services/email.service';
 
 export async function createBooking(req: Request, res: Response) {
   try {
@@ -135,6 +136,61 @@ export async function createBooking(req: Request, res: Response) {
       }
     } catch (aggError) {
       console.warn('Warning: Failed to recompute timeSlot aggregates:', aggError);
+    }
+
+    // Send confirmation email (for both admin and customer bookings)
+    try {
+      // Get package details for email
+      let packageDetails: any = null;
+      if (packageType === 'tour') {
+        const mongoose = require('mongoose');
+        const TourModel = mongoose.model('Tour');
+        packageDetails = await TourModel.findById(packageId);
+      } else if (packageType === 'transfer') {
+        const mongoose = require('mongoose');
+        const TransferModel = mongoose.model('Transfer');
+        packageDetails = await TransferModel.findById(packageId);
+      }
+
+      const emailData = {
+        customerName: contactInfo.name,
+        customerEmail: contactInfo.email,
+        bookingId: (booking as any)._id.toString(),
+        packageId: packageId,
+        packageName: packageDetails?.title || (packageType === 'tour' ? 'Tour Package' : 'Transfer Service'),
+        packageType,
+        date: (booking as any).date ? (booking as any).date.toISOString() : new Date(date).toISOString(),
+        time,
+        adults,
+        children: children || 0,
+        pickupLocation,
+        total,
+        currency: bookingPaymentInfo?.currency || "MYR"
+      };
+
+      // Add transfer-specific details
+      if (packageType === 'transfer' && packageDetails) {
+        (emailData as any).from = packageDetails.from;
+        (emailData as any).to = packageDetails.to;
+        
+        // Add vehicle information for private transfers
+        if (packageDetails.type === 'Private') {
+          (emailData as any).isVehicleBooking = true;
+          (emailData as any).vehicleName = packageDetails.vehicle;
+          (emailData as any).vehicleSeatCapacity = packageDetails.seatCapacity;
+        }
+      }
+
+      // Add pickup guidelines from package details
+      if (packageDetails?.details?.pickupGuidelines) {
+        (emailData as any).pickupGuidelines = packageDetails.details.pickupGuidelines;
+      }
+
+      await EmailService.sendBookingConfirmation(emailData);
+      console.log(`📧 Confirmation email sent to ${contactInfo.email} for ${isAdminBooking ? 'admin' : 'customer'} booking`);
+    } catch (emailError: any) {
+      console.error("📧 Failed to send confirmation email:", emailError.message);
+      // Don't fail the booking creation if email fails
     }
 
     return res.status(201).json({

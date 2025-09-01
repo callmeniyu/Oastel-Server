@@ -7,6 +7,7 @@ export interface TransferDetails {
     pickupOption: "admin" | "user"
     pickupLocations: string
     dropOffLocations?: string
+    pickupGuidelines?: string
     note?: string
     faq: Types.DocumentArray<FAQType>
 }
@@ -67,6 +68,7 @@ const TransferSchema = new Schema<TransferType>(
             pickupOption: { type: String, enum: ["admin", "user"] },
             pickupLocations: String,
             dropOffLocations: String,
+            pickupGuidelines: String,
             note: String,
             faq: [
                 {

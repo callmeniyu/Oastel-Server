@@ -244,6 +244,118 @@ router.get('/status', (req, res) => {
 });
 
 /**
+ * Test endpoint to send booking notification to admin
+ * POST /api/email/test-admin-notification
+ * Body: {} (no body required - sends to oastel.com@gmail.com)
+ */
+router.post('/test-admin-notification', async (req, res) => {
+  try {
+    console.log('📧 Testing admin booking notification...');
+
+    // Create sample booking data for admin notification
+    const sampleBooking = {
+      customerName: 'Jane Smith',
+      customerEmail: 'customer@example.com',
+      bookingId: 'ADMIN-TEST-' + Date.now(),
+      packageId: 'sample-transfer-456',
+      packageName: 'Cameron Highlands Transfer',
+      packageType: 'transfer' as const,
+      from: 'Kuala Lumpur',
+      to: 'Cameron Highlands',
+      date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days from now
+      time: '08:00',
+      adults: 2,
+      children: 0,
+      pickupLocation: 'KLCC Twin Towers',
+      total: 280.00,
+      currency: 'MYR',
+      isVehicleBooking: true,
+      vehicleName: 'Toyota Vellfire',
+      vehicleSeatCapacity: 7,
+    };
+
+    // Test both single booking notification and cart notification
+    const emailService = new EmailService();
+    
+    // Test single booking notification
+    console.log('📧 Testing single booking admin notification...');
+    const singleSuccess = await BrevoEmailService.sendBookingNotification(sampleBooking);
+
+    // Test cart booking notification
+    console.log('📧 Testing cart booking admin notification...');
+    const sampleCartData = {
+      customerName: 'John Carter',
+      customerEmail: 'john.carter@example.com',
+      bookings: [
+        {
+          bookingId: 'CART-TEST-1-' + Date.now(),
+          packageId: 'tour-123',
+          packageName: 'Langkawi Mangrove Tour',
+          packageType: 'tour' as const,
+          date: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+          time: '10:00',
+          adults: 4,
+          children: 2,
+          pickupLocation: 'Hotel Lobby',
+          total: 240.00,
+        },
+        {
+          bookingId: 'CART-TEST-2-' + Date.now(),
+          packageId: 'transfer-789',
+          packageName: 'Airport Pickup Service',
+          packageType: 'transfer' as const,
+          from: 'Langkawi Airport',
+          to: 'Pantai Cenang Hotel',
+          date: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+          time: '15:30',
+          adults: 4,
+          children: 2,
+          pickupLocation: 'Arrival Gate',
+          total: 45.00,
+          isVehicleBooking: true,
+          vehicleName: 'Honda Odyssey',
+          vehicleSeatCapacity: 8,
+        },
+      ],
+      totalAmount: 285.00,
+      currency: 'MYR',
+    };
+
+    const cartSuccess = await BrevoEmailService.sendCartBookingNotification(sampleCartData);
+
+    if (singleSuccess && cartSuccess) {
+      res.json({
+        success: true,
+        message: `Admin notification test emails sent successfully to ${process.env.NOTIFICATION_EMAIL || 'oastel.com@gmail.com'}`,
+        tests: {
+          singleBooking: singleSuccess,
+          cartBooking: cartSuccess,
+        },
+        provider: process.env.BREVO_API_KEY ? 'Brevo API' : 'SMTP',
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send admin notification test emails',
+        tests: {
+          singleBooking: singleSuccess,
+          cartBooking: cartSuccess,
+        },
+        provider: process.env.BREVO_API_KEY ? 'Brevo API' : 'SMTP',
+      });
+    }
+  } catch (error) {
+    console.error('Error in test admin notification endpoint:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * POST /api/email/feedback
  * Body: { name, email, message }
  */

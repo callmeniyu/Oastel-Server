@@ -111,6 +111,14 @@ class BookingController {
           }
         }
 
+        // Add pickup guidelines from package details (handle both new and legacy field names)
+        if (packageDetails?.details?.pickupGuidelines) {
+          (emailData as any).pickupGuidelines = packageDetails.details.pickupGuidelines;
+        } else if (packageType === 'transfer' && (packageDetails?.details as any)?.pickupDescription) {
+          // Fallback for legacy transfers that use pickupDescription
+          (emailData as any).pickupGuidelines = (packageDetails.details as any).pickupDescription;
+        }
+
         await EmailService.sendBookingConfirmation(emailData);
         console.log(`Confirmation email sent to ${contactInfo.email}`);
       } catch (emailError: any) {

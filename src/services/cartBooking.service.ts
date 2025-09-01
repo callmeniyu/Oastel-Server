@@ -287,7 +287,7 @@ export class CartBookingService {
           const cartEmailData = {
             customerName: request.contactInfo.name,
             customerEmail: request.contactInfo.email,
-            bookings: cartItemsForEmail.map((cartItem: any, index: number) => {
+            bookings: await Promise.all(cartItemsForEmail.map(async (cartItem: any, index: number) => {
               const bookingId = result.bookings[index] || '';
               const itemPrice = Number(cartItem?.totalPrice) || 0;
               const bankCharge = Number(itemPrice * 0.028) || 0;
@@ -297,6 +297,18 @@ export class CartBookingService {
               const safeIsoDate = rawDate
                 ? new Date(new Date(rawDate).toISOString().split('T')[0] + 'T12:00:00.000Z').toISOString()
                 : '';
+
+              // Fetch package details to get pickup guidelines
+              let packageDetails: any = null;
+              try {
+                if (cartItem?.packageType === 'tour') {
+                  packageDetails = await Tour.findById(cartItem.packageId);
+                } else if (cartItem?.packageType === 'transfer') {
+                  packageDetails = await Transfer.findById(cartItem.packageId);
+                }
+              } catch (err) {
+                console.warn(`Failed to fetch package details for ${cartItem.packageId}:`, err);
+              }
 
               return {
                 bookingId,
@@ -310,13 +322,14 @@ export class CartBookingService {
                 adults: cartItem?.adults || 1,
                 children: cartItem?.children || 0,
                 pickupLocation: cartItem?.pickupLocation || '',
+                pickupGuidelines: packageDetails?.details?.pickupGuidelines || (cartItem?.packageType === 'transfer' ? (packageDetails?.details as any)?.pickupDescription : '') || '',
                 total,
                 // Add vehicle information for private transfers
                 isVehicleBooking: cartItem?.isVehicleBooking || false,
                 vehicleName: cartItem?.vehicleName,
                 vehicleSeatCapacity: cartItem?.vehicleSeatCapacity
               };
-            }),
+            })),
             totalAmount: cartItemsForEmail.reduce((sum: number, item: any) => {
               const p = Number(item?.totalPrice) || 0;
               const bc = Number(p * 0.028) || 0;

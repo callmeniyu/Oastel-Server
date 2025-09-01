@@ -20,5 +20,6 @@ export const emailConfig = {
     website: process.env.COMPANY_WEBSITE || 'https://oastel.com',
     supportEmail: process.env.SUPPORT_EMAIL || 'support@oastel.com',
     supportPhone: process.env.SUPPORT_PHONE || '+60 12-345 6789',
+    notificationEmail: process.env.NOTIFICATION_EMAIL || 'oastel.com@gmail.com', // Admin notification email
   }
 };

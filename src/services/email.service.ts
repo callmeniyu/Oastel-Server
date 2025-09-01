@@ -18,6 +18,7 @@ export interface BookingEmailData {
   adults: number;
   children: number;
   pickupLocation?: string;
+  pickupGuidelines?: string;
   total: number;
   currency: string;
   // Private transfer vehicle details
@@ -41,6 +42,7 @@ export interface CartBookingEmailData {
     adults: number;
     children: number;
     pickupLocation?: string;
+    pickupGuidelines?: string;
     total: number;
     // Private transfer vehicle details
     isVehicleBooking?: boolean;
@@ -73,7 +75,18 @@ export class EmailService {
       // Try Brevo first (bypasses SMTP port blocking)
       if (process.env.BREVO_API_KEY) {
         console.log('📧 Using Brevo API for email delivery...');
-        return await BrevoEmailService.sendBookingConfirmation(booking);
+        const confirmationResult = await BrevoEmailService.sendBookingConfirmation(booking);
+        
+        // Also send notification to admin
+        try {
+          await BrevoEmailService.sendBookingNotification(booking);
+          console.log('📧 Admin notification sent for booking:', booking.bookingId);
+        } catch (notificationError) {
+          console.error('⚠️ Failed to send admin notification:', notificationError);
+          // Don't fail the main confirmation if notification fails
+        }
+        
+        return confirmationResult;
       }
 
       // Fallback to SMTP if Brevo is not configured
@@ -111,6 +124,22 @@ export class EmailService {
 
       await EmailService.transporter.sendMail(mailOptions);
       console.log(`Confirmation email sent to ${booking.customerEmail}`);
+      
+      // Also send notification to admin via SMTP
+      try {
+        const adminMailOptions = {
+          from: `"${emailConfig.from.name}" <${emailConfig.from.email}>`,
+          to: emailConfig.templates.notificationEmail,
+          subject: `🔔 New Booking Received - ${booking.packageName} (${booking.packageType})`,
+          html: this.generateBookingNotificationHTML(booking),
+        };
+        await EmailService.transporter.sendMail(adminMailOptions);
+        console.log('📧 Admin notification sent via SMTP for booking:', booking.bookingId);
+      } catch (notificationError) {
+        console.error('⚠️ Failed to send admin notification via SMTP:', notificationError);
+        // Don't fail the main confirmation if notification fails
+      }
+      
       return true;
     } catch (error) {
       console.error('Error sending confirmation email:', error);
@@ -126,7 +155,18 @@ export class EmailService {
       // Try Brevo first (bypasses SMTP port blocking)
       if (process.env.BREVO_API_KEY) {
         console.log('📧 Using Brevo API for cart booking email delivery...');
-        return await BrevoEmailService.sendCartBookingConfirmation(cartData);
+        const confirmationResult = await BrevoEmailService.sendCartBookingConfirmation(cartData);
+        
+        // Also send notification to admin
+        try {
+          await BrevoEmailService.sendCartBookingNotification(cartData);
+          console.log('📧 Admin notification sent for cart booking with', cartData.bookings.length, 'items');
+        } catch (notificationError) {
+          console.error('⚠️ Failed to send admin cart notification:', notificationError);
+          // Don't fail the main confirmation if notification fails
+        }
+        
+        return confirmationResult;
       }
 
       // Fallback to SMTP if Brevo is not configured
@@ -155,6 +195,22 @@ export class EmailService {
 
       await EmailService.transporter.sendMail(mailOptions);
       console.log(`Cart confirmation email sent to ${cartData.customerEmail} for ${cartData.bookings.length} bookings`);
+      
+      // Also send notification to admin via SMTP
+      try {
+        const adminMailOptions = {
+          from: `"${emailConfig.from.name}" <${emailConfig.from.email}>`,
+          to: emailConfig.templates.notificationEmail,
+          subject: `🔔 New Cart Booking Received - ${cartData.bookings.length} Bookings`,
+          html: this.generateCartBookingNotificationHTML(cartData),
+        };
+        await EmailService.transporter.sendMail(adminMailOptions);
+        console.log('📧 Admin cart notification sent via SMTP for', cartData.bookings.length, 'bookings');
+      } catch (notificationError) {
+        console.error('⚠️ Failed to send admin cart notification via SMTP:', notificationError);
+        // Don't fail the main confirmation if notification fails
+      }
+      
       return true;
     } catch (error) {
       console.error('Error sending cart confirmation email:', error);
@@ -1437,6 +1493,298 @@ export class EmailService {
                 <p style="font-size: 12px; color: #bbb; margin-top: 20px; font-family: 'Poppins', sans-serif;">
                     This email was sent to ${reviewData.customerEmail}<br>
                     © ${new Date().getFullYear()} ${emailConfig.from.name}. All rights reserved.
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+  }
+
+  /**
+   * Generate booking notification HTML for admin (SMTP version)
+   */
+  private generateBookingNotificationHTML(booking: BookingEmailData): string {
+    const formatDate = (dateString: string) => {
+      try {
+        if (!dateString) return "Invalid Date";
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return "Invalid Date";
+        return date.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+      } catch {
+        return "Invalid Date";
+      }
+    };
+
+    const formatTime = (timeString: string) => {
+      try {
+        if (!timeString) return "Invalid Time";
+        const [hours, minutes] = timeString.split(':');
+        if (!hours || !minutes) return timeString;
+        const date = new Date();
+        date.setHours(parseInt(hours), parseInt(minutes));
+        if (isNaN(date.getTime())) return timeString;
+        return date.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+      } catch {
+        return timeString;
+      }
+    };
+
+    return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>New Booking Notification</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f6f6f6; }
+            .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; }
+            .header { background: #dc2626; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { padding: 20px; }
+            .booking-details { background: #f9f9f9; border-radius: 8px; padding: 20px; margin: 20px 0; }
+            .detail-row { display: flex; justify-content: space-between; margin-bottom: 10px; padding: 8px 0; border-bottom: 1px solid #eee; }
+            .detail-label { font-weight: bold; color: #555; }
+            .detail-value { color: #333; }
+            .total-row { background: #dc2626; color: white; padding: 15px; border-radius: 6px; margin-top: 15px; }
+            .urgent { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 15px; border-radius: 6px; margin: 15px 0; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🔔 New Booking Alert</h1>
+                <p>A new booking has been received</p>
+            </div>
+            
+            <div class="content">
+                <div class="urgent">
+                    <strong>🚨 ACTION REQUIRED:</strong> A new booking has been placed and requires your attention.
+                </div>
+                
+                <h2 style="color: #dc2626; margin-bottom: 15px;">Booking Details</h2>
+                
+                <div class="booking-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Booking ID:</span>
+                        <span class="detail-value">#${booking.bookingId.slice(-8).toUpperCase()}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Package:</span>
+                        <span class="detail-value">${booking.packageName}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Type:</span>
+                        <span class="detail-value">${booking.packageType === 'tour' ? 'Tour Package' : 'Transfer Service'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Customer:</span>
+                        <span class="detail-value">${booking.customerName}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Email:</span>
+                        <span class="detail-value">${booking.customerEmail}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Date:</span>
+                        <span class="detail-value">${formatDate(booking.date)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Time:</span>
+                        <span class="detail-value">${formatTime(booking.time)}</span>
+                    </div>
+                    ${booking.packageType === 'transfer' && booking.from && booking.to ? `
+                    <div class="detail-row">
+                        <span class="detail-label">From:</span>
+                        <span class="detail-value">${booking.from}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">To:</span>
+                        <span class="detail-value">${booking.to}</span>
+                    </div>
+                    ` : ''}
+                    ${booking.isVehicleBooking ? `
+                    <div class="detail-row">
+                        <span class="detail-label">Vehicle:</span>
+                        <span class="detail-value">${booking.vehicleName || 'Private Vehicle'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Seat Capacity:</span>
+                        <span class="detail-value">${booking.vehicleSeatCapacity || 'N/A'} seats</span>
+                    </div>
+                    ` : `
+                    <div class="detail-row">
+                        <span class="detail-label">Adults:</span>
+                        <span class="detail-value">${booking.adults}</span>
+                    </div>
+                    ${booking.children > 0 ? `
+                    <div class="detail-row">
+                        <span class="detail-label">Children:</span>
+                        <span class="detail-value">${booking.children}</span>
+                    </div>
+                    ` : ''}
+                    `}
+                    ${booking.pickupLocation ? `
+                    <div class="detail-row">
+                        <span class="detail-label">Pickup Location:</span>
+                        <span class="detail-value">${booking.pickupLocation}</span>
+                    </div>
+                    ` : ''}
+                    
+                    <div class="total-row">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><strong>Total Amount:</strong></span>
+                            <span><strong>${booking.currency} ${booking.total.toFixed(2)}</strong></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="background: #e8f8f5; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                    <p><strong>⏰ Booking Time:</strong> ${new Date().toLocaleString()}</p>
+                    <p><strong>📧 Confirmation Email:</strong> Sent to customer at ${booking.customerEmail}</p>
+                </div>
+                
+                <p style="margin-top: 20px; color: #666;">
+                    Please review this booking and take any necessary actions. The customer has been sent a confirmation email.
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+  }
+
+  /**
+   * Generate cart booking notification HTML for admin (SMTP version)
+   */
+  private generateCartBookingNotificationHTML(cartData: CartBookingEmailData): string {
+    const formatDate = (dateString: string) => {
+      try {
+        if (!dateString) return "Invalid Date";
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return "Invalid Date";
+        return date.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        });
+      } catch {
+        return "Invalid Date";
+      }
+    };
+
+    const formatTime = (timeString: string) => {
+      try {
+        if (!timeString) return "Invalid Time";
+        const [hours, minutes] = timeString.split(':');
+        if (!hours || !minutes) return timeString;
+        const date = new Date();
+        date.setHours(parseInt(hours), parseInt(minutes));
+        if (isNaN(date.getTime())) return timeString;
+        return date.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+      } catch {
+        return timeString;
+      }
+    };
+
+    const bookingRows = cartData.bookings.map((booking, index) => `
+      <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 15px; margin-bottom: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h4 style="color: #dc2626; margin: 0;">Booking ${index + 1}</h4>
+          <span style="background: #dc2626; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+            #${booking.bookingId.slice(-6).toUpperCase()}
+          </span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
+          <div><strong>Package:</strong> ${booking.packageName}</div>
+          <div><strong>Type:</strong> ${booking.packageType === 'tour' ? 'Tour' : 'Transfer'}</div>
+          <div><strong>Date:</strong> ${formatDate(booking.date)}</div>
+          <div><strong>Time:</strong> ${formatTime(booking.time)}</div>
+          ${booking.isVehicleBooking ? `
+          <div><strong>Vehicle:</strong> ${booking.vehicleName || 'Private Vehicle'}</div>
+          <div><strong>Seats:</strong> ${booking.vehicleSeatCapacity || 'N/A'}</div>
+          ` : `
+          <div><strong>Adults:</strong> ${booking.adults}</div>
+          <div><strong>Children:</strong> ${booking.children}</div>
+          `}
+          ${booking.pickupLocation ? `
+          <div style="grid-column: 1 / -1;"><strong>Pickup:</strong> ${booking.pickupLocation}</div>
+          ` : ''}
+          <div style="grid-column: 1 / -1; text-align: right; margin-top: 8px;">
+            <strong style="color: #dc2626; font-size: 16px;">${cartData.currency} ${booking.total.toFixed(2)}</strong>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>New Cart Booking Notification</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f6f6f6; }
+            .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; }
+            .header { background: #dc2626; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { padding: 20px; }
+            .summary { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; margin: 20px 0; }
+            .urgent { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 15px; border-radius: 6px; margin: 15px 0; }
+            .total-summary { background: #dc2626; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🛒 Cart Booking Alert</h1>
+                <p>${cartData.bookings.length} new bookings from cart purchase</p>
+            </div>
+            
+            <div class="content">
+                <div class="urgent">
+                    <strong>🚨 MULTIPLE BOOKINGS:</strong> A customer has purchased ${cartData.bookings.length} items from their cart.
+                </div>
+                
+                <div class="summary">
+                    <h3 style="color: #dc2626; margin-bottom: 15px;">Customer Information</h3>
+                    <p><strong>Name:</strong> ${cartData.customerName}</p>
+                    <p><strong>Email:</strong> ${cartData.customerEmail}</p>
+                    <p><strong>Booking Time:</strong> ${new Date().toLocaleString()}</p>
+                </div>
+                
+                <h3 style="color: #dc2626; margin: 25px 0 15px 0;">All Bookings (${cartData.bookings.length} items):</h3>
+                ${bookingRows}
+                
+                <div class="total-summary">
+                    <h3>Total Cart Amount</h3>
+                    <div style="font-size: 24px; font-weight: bold; margin-top: 10px;">
+                        ${cartData.currency} ${cartData.totalAmount.toFixed(2)}
+                    </div>
+                </div>
+                
+                <div style="background: #e8f8f5; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                    <p><strong>📧 Customer Notification:</strong> A consolidated confirmation email has been sent to ${cartData.customerEmail}</p>
+                    <p><strong>💳 Payment Status:</strong> All bookings are pending payment confirmation</p>
+                </div>
+                
+                <p style="margin-top: 20px; color: #666;">
+                    Please review all ${cartData.bookings.length} bookings and take necessary actions. Each booking has been created with a unique booking ID.
                 </p>
             </div>
         </div>
