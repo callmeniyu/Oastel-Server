@@ -1,4 +1,5 @@
-import Stripe from 'stripe';
+// Import Stripe using require to avoid module resolution issues on some systems
+const Stripe = require('stripe');
 import { Request, Response } from 'express';
 
 // Validate that Stripe secret key is available
@@ -17,7 +18,7 @@ export class PaymentController {
   static async createPaymentIntent(req: Request, res: Response) {
     try {
       console.log('[PAYMENT] Creating payment intent for single booking:', req.body);
-      
+
       const {
         amount,
         currency = 'myr',
@@ -94,7 +95,7 @@ export class PaymentController {
   static async createCartPaymentIntent(req: Request, res: Response) {
     try {
       console.log('[PAYMENT] Creating payment intent for cart booking:', req.body);
-      
+
       const {
         amount,
         currency = 'myr',
@@ -176,7 +177,7 @@ export class PaymentController {
   static async confirmPayment(req: Request, res: Response) {
     try {
       console.log('[PAYMENT] Confirming payment:', req.body);
-      
+
       const { paymentIntentId, bookingData } = req.body;
 
       if (!paymentIntentId) {
@@ -189,7 +190,7 @@ export class PaymentController {
 
       // Retrieve payment intent from Stripe
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      
+
       console.log('[PAYMENT] Payment intent status:', paymentIntent.status);
 
       if (paymentIntent.status !== 'succeeded') {
@@ -206,15 +207,15 @@ export class PaymentController {
 
       // Import booking models and services
       const Booking = require('../models/Booking').default;
-      
+
       let bookingResult;
 
       if (paymentIntent.metadata.bookingType === 'cart') {
         // Handle cart booking
         const { cartBookingService } = require('../services/cartBooking.service');
-        
+
         console.log('[PAYMENT] Cart booking metadata:', paymentIntent.metadata);
-        
+
         const cartBookingRequest = {
           userEmail: paymentIntent.metadata.userEmail,
           contactInfo: bookingData.contactInfo,
@@ -228,11 +229,11 @@ export class PaymentController {
         };
 
         console.log('[PAYMENT] Cart booking request:', cartBookingRequest);
-        
+
         const cartResult = await cartBookingService.bookCartItems(cartBookingRequest);
-        
+
         console.log('[PAYMENT] Cart booking result:', cartResult);
-        
+
         // Transform cart service result to match expected format
         bookingResult = {
           success: cartResult.success,
@@ -241,7 +242,7 @@ export class PaymentController {
           error: cartResult.errors.length > 0 ? cartResult.errors.join(', ') : null,
           data: cartResult
         };
-        
+
       } else {
         // Handle single booking
         const finalBookingData = {
@@ -259,7 +260,7 @@ export class PaymentController {
         // Create single booking
         const booking = new Booking(finalBookingData);
         const savedBooking = await booking.save();
-        
+
         bookingResult = {
           success: true,
           data: savedBooking,
@@ -269,7 +270,7 @@ export class PaymentController {
 
       if (bookingResult.success) {
         console.log('[PAYMENT] Booking created successfully:', bookingResult.bookingIds);
-        
+
         res.json({
           success: true,
           message: 'Payment confirmed and booking created',
@@ -282,7 +283,7 @@ export class PaymentController {
         });
       } else {
         console.error('[PAYMENT] Failed to create booking after payment:', bookingResult.error);
-        
+
         // Payment was successful but booking creation failed
         // This is a critical error that needs manual intervention
         res.status(500).json({
@@ -305,7 +306,7 @@ export class PaymentController {
   // Handle webhook events from Stripe
   static async handleWebhook(req: Request, res: Response) {
     const sig = req.headers['stripe-signature'] as string;
-    let event: Stripe.Event;
+    let event: any;
 
     try {
       event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
@@ -318,7 +319,7 @@ export class PaymentController {
     // Handle the event
     switch (event.type) {
       case 'payment_intent.succeeded':
-        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        const paymentIntent = event.data.object as any;
         console.log('[WEBHOOK] Payment succeeded:', paymentIntent.id);
         // Additional logic can be added here
         break;
@@ -346,7 +347,7 @@ export class PaymentController {
       }
 
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      
+
       console.log('[PAYMENT] Payment status check:', paymentIntentId, paymentIntent.status);
 
       res.json({
