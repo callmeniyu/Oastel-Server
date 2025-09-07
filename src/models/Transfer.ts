@@ -35,6 +35,7 @@ export interface TransferType extends Document {
     from: string
     to: string
     details: TransferDetails
+    lastSlotsGeneratedAt?: Date  // Track when slots were last generated
     createdAt: Date
     updatedAt: Date
 }
@@ -77,6 +78,7 @@ const TransferSchema = new Schema<TransferType>(
                 },
             ],
         },
+        lastSlotsGeneratedAt: { type: Date }, // Track when slots were last generated to date
     },
     { timestamps: true }
 )

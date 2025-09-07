@@ -15,6 +15,9 @@ import cartBookingRoutes from "./routes/cartBooking.routes"
 import userRoutes from "./routes/user.routes"
 import emailRoutes from "./routes/email.routes"
 import vehicleRoutes from "./routes/vehicle.routes"
+import rollingTimeslotRoutes from "./routes/rollingTimeslot.routes"
+import paymentRoutes from "./routes/payment.routes"
+import paymentDebugRoutes from "./routes/paymentDebug.routes"
 
 const app = express()
 
@@ -40,6 +43,12 @@ app.use("/api/users", userRoutes)
 app.use("/api/email", emailRoutes)
 // Vehicle management for private transfers
 app.use("/api/vehicles", vehicleRoutes)
+// Rolling timeslot management
+app.use("/api/rolling-timeslots", rollingTimeslotRoutes)
+// Payment processing
+app.use("/api/payments", paymentRoutes)
+// Payment debugging
+app.use("/api/payment-debug", paymentDebugRoutes)
 
 
 export default app

@@ -14,6 +14,8 @@ const envSchema = z.object({
     CLOUDINARY_CLOUD_NAME: z.string(),
     CLOUDINARY_API_KEY: z.string(),
     CLOUDINARY_API_SECRET: z.string(),
+    STRIPE_SECRET_KEY: z.string().optional(), // Optional for now to avoid breaking existing setup
+    STRIPE_WEBHOOK_SECRET: z.string().optional(), // Optional for now
 })
 
 // Parse and validate environment variables
@@ -34,4 +36,6 @@ export const env = {
     CLOUDINARY_CLOUD_NAME: parsedEnv.data.CLOUDINARY_CLOUD_NAME,
     CLOUDINARY_API_KEY: parsedEnv.data.CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET: parsedEnv.data.CLOUDINARY_API_SECRET,
+    STRIPE_SECRET_KEY: parsedEnv.data.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: parsedEnv.data.STRIPE_WEBHOOK_SECRET,
 }

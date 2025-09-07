@@ -15,6 +15,13 @@ export interface CartBookingRequest {
     phone: string;
     whatsapp?: string;
   };
+  paymentInfo?: {
+    paymentIntentId: string;
+    amount: number;
+    currency: string;
+    paymentStatus: string;
+    paymentMethod: string;
+  };
 }
 
 export interface CartBookingResult {
@@ -143,7 +150,15 @@ export class CartBookingService {
               phone: String(request.contactInfo.phone || ''),
               whatsapp: String(request.contactInfo.whatsapp || request.contactInfo.phone || '')
             },
-            paymentInfo: {
+            paymentInfo: request.paymentInfo ? {
+              paymentStatus: request.paymentInfo.paymentStatus,
+              amount: Number(request.paymentInfo.amount) || Number(item.totalPrice) || 0,
+              bankCharge: Number(item.totalPrice * 0.028) || 0, // 2.8% bank charge
+              currency: request.paymentInfo.currency || 'MYR',
+              refundStatus: 'none',
+              paymentIntentId: request.paymentInfo.paymentIntentId,
+              paymentMethod: request.paymentInfo.paymentMethod
+            } : {
               paymentStatus: 'pending',
               amount: Number(item.totalPrice) || 0,
               bankCharge: Number(item.totalPrice * 0.028) || 0, // 2.8% bank charge

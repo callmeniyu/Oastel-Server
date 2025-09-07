@@ -30,6 +30,7 @@ export interface TourType extends Document {
     departureTimes: string[] // e.g. ["08:00 AM","01:30 PM"]
     label?: "Recommended" | "Popular" | "Best Value" | "Best seller"
     details: TourDetails
+    lastSlotsGeneratedAt?: Date  // Track when slots were last generated
     createdAt: Date
     updatedAt: Date
 }
@@ -67,6 +68,7 @@ const TourSchema = new Schema<TourType>(
                 },
             ],
         },
+        lastSlotsGeneratedAt: { type: Date }, // Track when slots were last generated to date
     },
     { timestamps: true }
 )
