@@ -324,8 +324,8 @@ export class PaymentController {
         // Additional logic can be added here
         break;
       case 'payment_intent.payment_failed':
-        const failedPayment = event.data.object as Stripe.PaymentIntent;
-        console.log('[WEBHOOK] Payment failed:', failedPayment.id, failedPayment.last_payment_error?.message);
+        const failedPayment = event.data.object as any;
+        console.log('[WEBHOOK] Payment failed:', failedPayment?.id, failedPayment?.last_payment_error?.message);
         break;
       default:
         console.log('[WEBHOOK] Unhandled event type:', event.type);
