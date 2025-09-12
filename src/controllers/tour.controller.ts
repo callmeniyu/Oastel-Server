@@ -1,12 +1,16 @@
 import { Request, Response } from "express"
 import { Types } from "mongoose"
 import Tour, { TourType } from "../models/Tour"
+import Vehicle from "../models/Vehicle"
 import { generateSlug } from "../utils/generateSlug"
 import { TimeSlotService } from "../services/timeSlot.service"
 
 export const createTour = async (req: Request, res: Response) => {
     try {
         const tourData = req.body
+        // Debug: log incoming vehicle field for private tours
+        console.log('createTour - incoming vehicle:', tourData?.vehicle)
+        console.log('createTour - incoming type:', tourData?.type)
 
         // Ensure packageType is always 'tour'
         tourData.packageType = "tour"
@@ -25,6 +29,19 @@ export const createTour = async (req: Request, res: Response) => {
             })
         }
 
+        // Validate that Private tours have a vehicle
+        if (tourData.type === "private" && (!tourData.vehicle || tourData.vehicle.trim() === "")) {
+            return res.status(400).json({
+                success: false,
+                message: "Vehicle name is required for Private tours",
+            })
+        }
+
+        // For Private tours, set minimumPerson to 1 (vehicle booking, not person-based)
+        if (tourData.type === "private") {
+            tourData.minimumPerson = 1
+        }
+
         // Filter out empty FAQ items
         if (tourData.details && tourData.details.faq) {
             tourData.details.faq = tourData.details.faq.filter((faq: any) => faq.question.trim() && faq.answer.trim())
@@ -40,11 +57,31 @@ export const createTour = async (req: Request, res: Response) => {
 
         // Generate time slots for the tour (90 days ahead)
         try {
+            // Determine capacity based on tour type
+            let capacity
+            if (tourData.type === "private" && tourData.vehicle) {
+                // For Private tours: use vehicle.units (number of vehicles available)
+                try {
+                    const vehicleDoc = await Vehicle.findOne({ name: tourData.vehicle }).lean()
+                    if (vehicleDoc && typeof vehicleDoc.units === 'number') {
+                        capacity = vehicleDoc.units
+                    } else {
+                        capacity = 1 // Default to 1 vehicle if vehicle not found
+                    }
+                } catch (err) {
+                    console.warn('Failed to lookup vehicle for private tour slot capacity, using default 1', err)
+                    capacity = 1
+                }
+            } else {
+                // For Co-tours: use maximumPerson (number of person seats)
+                capacity = tourData.maximumPerson || 10
+            }
+
             await TimeSlotService.generateSlotsForPackage(
                 "tour",
                 savedTour._id as Types.ObjectId,
                 tourData.departureTimes || [],
-                tourData.maximumPerson || 10
+                capacity
             )
             console.log(`Time slots generated for tour: ${savedTour._id}`)
         } catch (slotError) {
@@ -175,6 +212,9 @@ export const updateTour = async (req: Request, res: Response) => {
     try {
         const { id } = req.params
         const tourData = req.body
+        // Debug: log incoming vehicle field for update
+        console.log('updateTour - incoming vehicle:', tourData?.vehicle)
+        console.log('updateTour - incoming type:', tourData?.type)
 
         // Get existing tour to check if image changed
         const existingTour = await Tour.findById(id)
@@ -187,6 +227,19 @@ export const updateTour = async (req: Request, res: Response) => {
 
         // Ensure packageType is always 'tour'
         tourData.packageType = "tour"
+
+        // Validate that Private tours have a vehicle
+        if (tourData.type === "private" && (!tourData.vehicle || tourData.vehicle.trim() === "")) {
+            return res.status(400).json({
+                success: false,
+                message: "Vehicle name is required for Private tours",
+            })
+        }
+
+        // For Private tours, set minimumPerson to 1 (vehicle booking, not person-based)
+        if (tourData.type === "private") {
+            tourData.minimumPerson = 1
+        }
 
         // Handle label - convert "None" to null
         if (tourData.label === "None") {
@@ -213,10 +266,45 @@ export const updateTour = async (req: Request, res: Response) => {
         // Update time slots if departure times or capacity changed
         try {
             const departureTimes = tourData.departureTimes || existingTour.departureTimes
-            const capacity = tourData.maximumPerson || existingTour.maximumPerson || 10
+            
+            // Determine capacity based on tour type (same logic as creation)
+            let capacity
+            const tourType = tourData.type || existingTour.type
+            const vehicleName = tourData.vehicle || existingTour.vehicle
+            
+            if (tourType === "private" && vehicleName) {
+                // For Private tours: use vehicle.units (number of vehicles available)
+                try {
+                    const vehicleDoc = await Vehicle.findOne({ name: vehicleName }).lean()
+                    if (vehicleDoc && typeof vehicleDoc.units === 'number') {
+                        capacity = vehicleDoc.units
+                    } else {
+                        capacity = 1 // Default to 1 vehicle if vehicle not found
+                    }
+                } catch (err) {
+                    console.warn('Failed to lookup vehicle for private tour update, using default 1', err)
+                    capacity = 1
+                }
+            } else {
+                // For Co-tours: use maximumPerson (number of person seats)
+                capacity = tourData.maximumPerson || existingTour.maximumPerson || 10
+            }
+            
+            // Calculate existing capacity to compare for changes
+            let existingCapacity
+            if (existingTour.type === "private" && existingTour.vehicle) {
+                try {
+                    const vehicleDoc = await Vehicle.findOne({ name: existingTour.vehicle }).lean()
+                    existingCapacity = (vehicleDoc && typeof vehicleDoc.units === 'number') ? vehicleDoc.units : 1
+                } catch (err) {
+                    existingCapacity = 1
+                }
+            } else {
+                existingCapacity = existingTour.maximumPerson || 10
+            }
             
             if (JSON.stringify(departureTimes) !== JSON.stringify(existingTour.departureTimes) || 
-                capacity !== existingTour.maximumPerson) {
+                capacity !== existingCapacity) {
                 await TimeSlotService.updateSlotsForPackage(
                     "tour",
                     tour._id as Types.ObjectId,

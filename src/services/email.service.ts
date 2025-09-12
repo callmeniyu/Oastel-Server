@@ -553,6 +553,26 @@ export class EmailService {
                                     gap: 16px;
                                     align-items: center;
                                 ">
+                                    ${booking.isVehicleBooking ? `
+                                    <div>
+                                        <div style="
+                                            font-size: 18px;
+                                            font-weight: 700;
+                                            color: #8b5cf6;
+                                            font-family: 'Poppins', sans-serif;
+                                        ">Vehicle</div>
+                                        <div style="
+                                            font-size: 13px;
+                                            color: #6b7280;
+                                            font-family: 'Poppins', sans-serif;
+                                        ">${booking.vehicleName || 'Private Vehicle'}</div>
+                                        <div style="
+                                            font-size: 12px;
+                                            color: #6b7280;
+                                            font-family: 'Poppins', sans-serif;
+                                        ">${booking.vehicleSeatCapacity || 'N/A'} seats</div>
+                                    </div>
+                                    ` : `
                                     <div>
                                         <div style="
                                             font-size: 18px;
@@ -587,8 +607,9 @@ export class EmailService {
                                         <div style="font-size:12px; color:#6b7280; margin-top:6px;">Age between 3 to 7 years</div>
                                     </div>
                                     ` : ''}
+                                    `}
                                 </div>
-                                ${booking.children > 0 ? `
+                                ${!booking.isVehicleBooking && booking.children > 0 ? `
                                 <div style="display:flex; gap:16px; margin-top:8px;">
                                     <div style="flex:1;">
                                         <div style="font-size:12px; font-weight:600; color:#6b7280;">Age between 3 to 7 years</div>
@@ -940,7 +961,12 @@ export class EmailService {
     const baseUrl = emailConfig.templates.website;
 
     const totalBookings = cartData.bookings.length;
-    const totalGuests = cartData.bookings.reduce((total, booking) => total + booking.adults + booking.children, 0);
+    const totalGuests = cartData.bookings.reduce((total, booking) => {
+      if (booking.isVehicleBooking) {
+        return total + 1; // Count vehicle as 1 unit
+      }
+      return total + booking.adults + booking.children;
+    }, 0);
 
     // Generate booking rows HTML
     const bookingRows = cartData.bookings.map((booking, index) => {
@@ -973,7 +999,10 @@ export class EmailService {
                                         <td style="width: 50%; padding: 6px 8px; vertical-align: top; color: #444; font-size: 13px;">
                                             <div><strong>Date:</strong> ${formattedDate}</div>
                                             <div style="margin-top:4px;"><strong>Time:</strong> ${formattedTime}</div>
-                                            <div style="margin-top:4px;"><strong>Guests:</strong> ${booking.adults} adult${booking.adults > 1 ? 's' : ''}${booking.children > 0 ? `, ${booking.children} child${booking.children > 1 ? 'ren' : ''}` : ''}</div>
+                                            <div style="margin-top:4px;"><strong>Guests:</strong> ${booking.isVehicleBooking ? 
+                                              `Vehicle - ${booking.vehicleName || 'Private Vehicle'} (${booking.vehicleSeatCapacity || 'N/A'} seats)` : 
+                                              `${booking.adults} adult${booking.adults > 1 ? 's' : ''}${booking.children > 0 ? `, ${booking.children} child${booking.children > 1 ? 'ren' : ''}` : ''}`
+                                            }</div>
                                             ${booking.children > 0 ? `</div>
                                             </td>
                                         </tr>
@@ -1093,7 +1122,7 @@ export class EmailService {
                         </div>
                         <div class="summary-item" role="presentation">
                             <div class="summary-number">${totalGuests}</div>
-                            <div class="summary-label">Total Guests</div>
+                            <div class="summary-label">${cartData.bookings.some(b => b.isVehicleBooking) ? 'Guests/Vehicles' : 'Total Guests'}</div>
                         </div>
                         <div class="summary-item" role="presentation">
                             <div class="summary-number">${cartData.currency} ${cartData.totalAmount.toFixed(2)}</div>

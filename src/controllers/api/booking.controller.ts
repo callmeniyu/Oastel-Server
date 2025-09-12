@@ -181,6 +181,13 @@ export async function createBooking(req: Request, res: Response) {
         }
       }
 
+      // Add vehicle information for private tours
+      if (packageType === 'tour' && packageDetails && packageDetails.type === 'private') {
+        (emailData as any).isVehicleBooking = true;
+        (emailData as any).vehicleName = packageDetails.vehicle;
+        (emailData as any).vehicleSeatCapacity = packageDetails.seatCapacity;
+      }
+
       // Add pickup guidelines from package details
       if (packageDetails?.details?.pickupGuidelines) {
         (emailData as any).pickupGuidelines = packageDetails.details.pickupGuidelines;

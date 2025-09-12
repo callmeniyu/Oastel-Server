@@ -111,6 +111,13 @@ class BookingController {
           }
         }
 
+        // Add vehicle information for private tours
+        if (packageType === 'tour' && packageDetails && packageDetails.type === 'private') {
+          (emailData as any).isVehicleBooking = true;
+          (emailData as any).vehicleName = packageDetails.vehicle;
+          (emailData as any).vehicleSeatCapacity = packageDetails.seatCapacity;
+        }
+
         // Add pickup guidelines from package details (handle both new and legacy field names)
         if (packageDetails?.details?.pickupGuidelines) {
           (emailData as any).pickupGuidelines = packageDetails.details.pickupGuidelines;
