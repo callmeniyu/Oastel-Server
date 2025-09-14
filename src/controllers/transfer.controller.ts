@@ -215,6 +215,18 @@ export const getTransferBySlug = async (req: Request, res: Response) => {
         const { slug } = req.params
         const transfer = await Transfer.findOne({ slug }).lean() // Use lean() for better performance
 
+        // Debug: log FAQ count and a short sample to help diagnose production truncation issues
+        try {
+            if (transfer && transfer.details && Array.isArray(transfer.details.faq)) {
+                console.log(`getTransferBySlug - slug=${slug} - faqCount=${transfer.details.faq.length}`)
+                console.log(`getTransferBySlug - faqSample=`, transfer.details.faq.slice(0, 5))
+            } else {
+                console.log(`getTransferBySlug - slug=${slug} - no faqs present`)
+            }
+        } catch (logErr) {
+            console.warn('getTransferBySlug - failed to log faq info', logErr)
+        }
+
         if (!transfer) {
             return res.status(404).json({
                 success: false,

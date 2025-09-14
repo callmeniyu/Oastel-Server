@@ -188,6 +188,18 @@ export const getTourBySlug = async (req: Request, res: Response) => {
         const { slug } = req.params
         const tour = await Tour.findOne({ slug }).lean() // Use lean() for better performance
 
+        // Debug: log FAQ count and a short sample to help diagnose production truncation issues
+        try {
+            if (tour && tour.details && Array.isArray(tour.details.faq)) {
+                console.log(`getTourBySlug - slug=${slug} - faqCount=${tour.details.faq.length}`)
+                console.log(`getTourBySlug - faqSample=`, tour.details.faq.slice(0, 5))
+            } else {
+                console.log(`getTourBySlug - slug=${slug} - no faqs present`)
+            }
+        } catch (logErr) {
+            console.warn('getTourBySlug - failed to log faq info', logErr)
+        }
+
         if (!tour) {
             return res.status(404).json({
                 success: false,
