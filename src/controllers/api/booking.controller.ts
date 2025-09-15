@@ -102,40 +102,44 @@ export async function createBooking(req: Request, res: Response) {
       ...(isAdminBooking && { isAdminBooking: true })
     });
 
-    // Save booking first (do not pre-update slot counts here)
+    // Save booking first (slot counts will be updated on payment confirmation)
     await booking.save();
 
-    // Update slot with proper minimum person logic using TimeSlotService
-    try {
-      await TimeSlotService.updateSlotBooking(
-        packageType,
-        new Types.ObjectId(packageId),
-        date,
-        time,
-        totalGuests,
-        'add'
-      );
-    } catch (updateError) {
-      console.warn('Warning: TimeSlotService update failed:', updateError);
-      // Don't fail the booking if slot service update fails
-    }
+    // Note: TimeSlotService.updateSlotBooking() is now called only on payment confirmation
+    // to ensure slots are only updated for paid bookings, not pending ones
+    console.log(`✅ Created ${isAdminBooking ? 'admin' : 'customer'} booking ${booking._id} - slot updates deferred to payment confirmation`);
 
     // Recompute and persist document-level aggregates (booked / isAvailable)
-    try {
-      const refreshedTimeSlot = await TimeSlot.findOne({
-        packageId: new Types.ObjectId(packageId),
-        packageType,
-        date
-      });
-      if (refreshedTimeSlot) {
-        // Aggregate booked count from individual slots
-        const aggregateBooked = refreshedTimeSlot.slots.reduce((sum, s) => sum + (s.bookedCount || 0), 0);
-        refreshedTimeSlot.booked = aggregateBooked;
-        refreshedTimeSlot.isAvailable = aggregateBooked < (refreshedTimeSlot.capacity || 0);
-        await refreshedTimeSlot.save();
+    // Skip this for pending bookings since we're not updating slot counts yet
+    if (isAdminBooking && paymentInfo?.paymentStatus === 'succeeded') {
+      try {
+        // For admin bookings that are immediately paid, update slots
+        await TimeSlotService.updateSlotBooking(
+          packageType,
+          new Types.ObjectId(packageId),
+          date,
+          time,
+          totalGuests,
+          'add'
+        );
+        console.log(`✅ Updated slots for paid admin booking ${booking._id}`);
+
+        const refreshedTimeSlot = await TimeSlot.findOne({
+          packageId: new Types.ObjectId(packageId),
+          packageType,
+          date
+        });
+        if (refreshedTimeSlot) {
+          // Aggregate booked count from individual slots
+          const aggregateBooked = refreshedTimeSlot.slots.reduce((sum, s) => sum + (s.bookedCount || 0), 0);
+          refreshedTimeSlot.booked = aggregateBooked;
+          refreshedTimeSlot.isAvailable = aggregateBooked < (refreshedTimeSlot.capacity || 0);
+          await refreshedTimeSlot.save();
+        }
+      } catch (updateError) {
+        console.warn('Warning: TimeSlotService update failed for admin booking:', updateError);
+        // Don't fail the booking if slot service update fails
       }
-    } catch (aggError) {
-      console.warn('Warning: Failed to recompute timeSlot aggregates:', aggError);
     }
 
     // Send confirmation email (for both admin and customer bookings)

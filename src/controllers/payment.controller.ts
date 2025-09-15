@@ -1,6 +1,7 @@
 // Import Stripe using require to avoid module resolution issues on some systems
 const Stripe = require('stripe');
 import { Request, Response } from 'express';
+import { EmailService } from '../services/email.service';
 
 // Validate that Stripe secret key is available
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -14,6 +15,33 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 export class PaymentController {
+  // Helper method to check email configuration
+  private static checkEmailConfiguration(): { canSendEmail: boolean; method: string; issues: string[] } {
+    const issues: string[] = [];
+    let method = 'none';
+    let canSendEmail = false;
+
+    // Check Brevo configuration
+    if (process.env.BREVO_API_KEY) {
+      method = 'brevo';
+      canSendEmail = true;
+    } else {
+      issues.push('BREVO_API_KEY not set');
+    }
+
+    // Check SMTP configuration if Brevo is not available
+    if (!canSendEmail) {
+      if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+        method = 'smtp';
+        canSendEmail = true;
+      } else {
+        if (!process.env.SMTP_USER) issues.push('SMTP_USER not set');
+        if (!process.env.SMTP_PASS) issues.push('SMTP_PASS not set');
+      }
+    }
+
+    return { canSendEmail, method, issues };
+  }
   // Create payment intent for single booking
   static async createPaymentIntent(req: Request, res: Response) {
     try {
@@ -202,8 +230,8 @@ export class PaymentController {
         });
       }
 
-      // Payment successful - now create the booking
-      console.log('[PAYMENT] Payment successful, creating booking...');
+      // Payment successful - update existing bookings and send confirmation emails
+      console.log('[PAYMENT] Payment successful, updating existing bookings...');
 
       // Import booking models and services
       const Booking = require('../models/Booking').default;
@@ -211,61 +239,326 @@ export class PaymentController {
       let bookingResult;
 
       if (paymentIntent.metadata.bookingType === 'cart') {
-        // Handle cart booking
-        const { cartBookingService } = require('../services/cartBooking.service');
+        // Handle cart booking - find existing bookings by payment intent ID
+        console.log('[PAYMENT] Cart booking - finding existing bookings...');
+        
+        const existingBookings = await Booking.find({
+          'paymentInfo.paymentIntentId': paymentIntent.id,
+          'paymentInfo.paymentStatus': 'pending'
+        });
 
-        console.log('[PAYMENT] Cart booking metadata:', paymentIntent.metadata);
+        console.log('[PAYMENT] Found existing bookings:', existingBookings.length);
 
-        const cartBookingRequest = {
-          userEmail: paymentIntent.metadata.userEmail,
-          contactInfo: bookingData.contactInfo,
-          paymentInfo: {
-            paymentIntentId: paymentIntent.id,
-            amount: paymentIntent.amount / 100, // Convert back from cents
-            currency: paymentIntent.currency,
-            paymentStatus: 'succeeded',
-            paymentMethod: 'stripe'
+        if (existingBookings.length === 0) {
+          // No existing bookings found, create new ones using cart service
+          const { cartBookingService } = require('../services/cartBooking.service');
+
+          const cartBookingRequest = {
+            userEmail: paymentIntent.metadata.userEmail,
+            contactInfo: bookingData.contactInfo,
+            paymentInfo: {
+              paymentIntentId: paymentIntent.id,
+              amount: paymentIntent.amount / 100,
+              currency: paymentIntent.currency,
+              paymentStatus: 'succeeded',
+              paymentMethod: 'stripe'
+            }
+          };
+
+          const cartResult = await cartBookingService.bookCartItems(cartBookingRequest);
+          bookingResult = {
+            success: cartResult.success,
+            bookingIds: cartResult.bookings,
+            totalBookings: cartResult.bookings.length,
+            error: cartResult.errors.length > 0 ? cartResult.errors.join(', ') : null,
+            data: cartResult
+          };
+        } else {
+          // Update existing bookings payment status AND update slot counts
+          const updateResult = await Booking.updateMany(
+            { 'paymentInfo.paymentIntentId': paymentIntent.id },
+            { 
+              $set: { 
+                'paymentInfo.paymentStatus': 'succeeded',
+                'paymentInfo.paymentMethod': 'stripe'
+              }
+            }
+          );
+
+          console.log('[PAYMENT] Updated', updateResult.modifiedCount, 'existing bookings');
+
+          // Update slot counts for each existing booking (now that payment is confirmed)
+          try {
+            const { TimeSlotService } = require('../services/timeSlot.service');
+            for (const booking of existingBookings) {
+              const totalGuests = (booking.adults || 0) + (booking.children || 0);
+              await TimeSlotService.updateSlotBooking(
+                booking.packageType,
+                booking.packageId,
+                booking.date,
+                booking.time,
+                totalGuests,
+                'add'
+              );
+              console.log(`[PAYMENT] ✅ Updated slot for cart booking ${booking._id}`);
+            }
+          } catch (slotError) {
+            console.error('[PAYMENT] ❌ Failed to update slots for cart bookings:', slotError);
           }
-        };
 
-        console.log('[PAYMENT] Cart booking request:', cartBookingRequest);
+          bookingResult = {
+            success: true,
+            bookingIds: existingBookings.map((b: any) => b._id),
+            totalBookings: existingBookings.length,
+            data: existingBookings
+          };
+        }
 
-        const cartResult = await cartBookingService.bookCartItems(cartBookingRequest);
+        // Send cart confirmation email after payment success
+        if (bookingResult.success && bookingData?.contactInfo?.email) {
+          try {
+            // Fetch package details for proper package names in email
+            const bookingsWithPackageNames = await Promise.all(
+              bookingResult.data.map(async (booking: any) => {
+                let packageName = booking.packageType === 'tour' ? 'Tour Package' : 'Transfer Service';
+                
+                try {
+                  if (booking.packageType === 'tour') {
+                    const mongoose = require('mongoose');
+                    const TourModel = mongoose.model('Tour');
+                    const packageDetails = await TourModel.findById(booking.packageId);
+                    packageName = packageDetails?.title || packageName;
+                  } else if (booking.packageType === 'transfer') {
+                    const mongoose = require('mongoose');
+                    const TransferModel = mongoose.model('Transfer');
+                    const packageDetails = await TransferModel.findById(booking.packageId);
+                    packageName = packageDetails?.title || packageName;
+                  }
+                } catch (packageError) {
+                  console.warn(`[PAYMENT] Could not fetch package details for ${booking.packageId}:`, packageError);
+                }
 
-        console.log('[PAYMENT] Cart booking result:', cartResult);
+                return {
+                  bookingId: booking._id.toString(),
+                  packageId: booking.packageId,
+                  packageName,
+                  packageType: booking.packageType,
+                  date: booking.date,
+                  time: booking.time,
+                  adults: booking.adults,
+                  children: booking.children || 0,
+                  pickupLocation: booking.pickupLocation,
+                  total: booking.total,
+                  currency: booking.paymentInfo?.currency || 'MYR'
+                };
+              })
+            );
 
-        // Transform cart service result to match expected format
-        bookingResult = {
-          success: cartResult.success,
-          bookingIds: cartResult.bookings,
-          totalBookings: cartResult.bookings.length,
-          error: cartResult.errors.length > 0 ? cartResult.errors.join(', ') : null,
-          data: cartResult
-        };
+            // Prepare cart email data
+            const cartEmailData = {
+              customerName: bookingData.contactInfo.name,
+              customerEmail: bookingData.contactInfo.email,
+              bookings: bookingsWithPackageNames,
+              totalAmount: paymentIntent.amount / 100,
+              currency: paymentIntent.currency.toUpperCase()
+            };
+
+            console.log('[PAYMENT] Sending cart confirmation email...');
+            console.log('[PAYMENT] Email recipient:', cartEmailData.customerEmail);
+            console.log('[PAYMENT] Total bookings:', cartEmailData.bookings.length);
+            
+            // Check email configuration before attempting to send
+            const emailConfig = PaymentController.checkEmailConfiguration();
+            console.log('[PAYMENT] Email config check:', emailConfig);
+            
+            if (!emailConfig.canSendEmail) {
+              console.error('[PAYMENT] ❌ Cannot send email - configuration issues:', emailConfig.issues);
+              throw new Error(`Email configuration incomplete: ${emailConfig.issues.join(', ')}`);
+            }
+            
+            const emailService = new EmailService();
+            const emailSent = await emailService.sendCartBookingConfirmation(cartEmailData);
+            
+            if (emailSent) {
+              console.log('[PAYMENT] ✅ Cart confirmation email sent successfully');
+            } else {
+              console.error('[PAYMENT] ⚠️ Cart confirmation email failed to send');
+            }
+          } catch (emailError) {
+            console.error('[PAYMENT] ❌ Failed to send cart confirmation email:', emailError);
+            // Log additional debug info
+            console.error('[PAYMENT] Email error details:', {
+              customerEmail: bookingData?.contactInfo?.email,
+              bookingCount: bookingResult?.data?.length,
+              hasBrevoKey: !!process.env.BREVO_API_KEY,
+              hasSmtpConfig: !!(process.env.SMTP_USER && process.env.SMTP_PASS)
+            });
+          }
+        }
 
       } else {
-        // Handle single booking
-        const finalBookingData = {
-          ...bookingData,
-          paymentInfo: {
-            paymentIntentId: paymentIntent.id,
-            amount: paymentIntent.amount / 100, // Convert back from cents
-            currency: paymentIntent.currency,
-            paymentStatus: 'succeeded',
-            paymentMethod: 'stripe',
-            bankCharge: Math.round((paymentIntent.amount / 100) * 0.028 * 100) / 100
+        // Handle single booking - find existing booking by payment intent ID
+        console.log('[PAYMENT] Single booking - finding existing booking...');
+        
+        const existingBooking = await Booking.findOne({
+          'paymentInfo.paymentIntentId': paymentIntent.id,
+          'paymentInfo.paymentStatus': 'pending'
+        });
+
+        if (existingBooking) {
+          // Update existing booking payment status AND update slot counts
+          existingBooking.paymentInfo.paymentStatus = 'succeeded';
+          existingBooking.paymentInfo.paymentMethod = 'stripe';
+          const savedBooking = await existingBooking.save();
+
+          console.log('[PAYMENT] Updated existing booking:', savedBooking._id);
+
+          // Update slot counts for existing booking (now that payment is confirmed)
+          try {
+            const { TimeSlotService } = require('../services/timeSlot.service');
+            const totalGuests = (existingBooking.adults || 0) + (existingBooking.children || 0);
+            await TimeSlotService.updateSlotBooking(
+              existingBooking.packageType,
+              existingBooking.packageId,
+              existingBooking.date,
+              existingBooking.time,
+              totalGuests,
+              'add'
+            );
+            console.log('[PAYMENT] ✅ Updated slot for single booking:', savedBooking._id);
+          } catch (slotError) {
+            console.error('[PAYMENT] ❌ Failed to update slot for single booking:', slotError);
           }
-        };
 
-        // Create single booking
-        const booking = new Booking(finalBookingData);
-        const savedBooking = await booking.save();
+          bookingResult = {
+            success: true,
+            data: savedBooking,
+            bookingIds: [savedBooking._id]
+          };
+        } else {
+          // No existing booking found, create new one
+          const finalBookingData = {
+            ...bookingData,
+            paymentInfo: {
+              paymentIntentId: paymentIntent.id,
+              amount: paymentIntent.amount / 100,
+              currency: paymentIntent.currency,
+              paymentStatus: 'succeeded',
+              paymentMethod: 'stripe',
+              bankCharge: Math.round((paymentIntent.amount / 100) * 0.028 * 100) / 100
+            }
+          };
 
-        bookingResult = {
-          success: true,
-          data: savedBooking,
-          bookingIds: [savedBooking._id]
-        };
+          const booking = new Booking(finalBookingData);
+          const savedBooking = await booking.save();
+
+          // Update slot counts for new booking created after payment
+          try {
+            const { TimeSlotService } = require('../services/timeSlot.service');
+            const totalGuests = (bookingData.adults || 0) + (bookingData.children || 0);
+            await TimeSlotService.updateSlotBooking(
+              bookingData.packageType,
+              bookingData.packageId,
+              bookingData.date,
+              bookingData.time,
+              totalGuests,
+              'add'
+            );
+            console.log('[PAYMENT] ✅ Slot updated for new booking created after payment');
+          } catch (slotError) {
+            console.error('[PAYMENT] ❌ Failed to update slot for new booking:', slotError);
+          }
+
+          bookingResult = {
+            success: true,
+            data: savedBooking,
+            bookingIds: [savedBooking._id]
+          };
+        }
+
+        // Send single booking confirmation email after payment success
+        if (bookingResult.success && bookingData?.contactInfo?.email) {
+          try {
+            // Get package details for email
+            let packageDetails: any = null;
+            if (bookingData.packageType === 'tour') {
+              const mongoose = require('mongoose');
+              const TourModel = mongoose.model('Tour');
+              packageDetails = await TourModel.findById(bookingData.packageId);
+            } else if (bookingData.packageType === 'transfer') {
+              const mongoose = require('mongoose');
+              const TransferModel = mongoose.model('Transfer');
+              packageDetails = await TransferModel.findById(bookingData.packageId);
+            }
+
+            const emailData: any = {
+              customerName: bookingData.contactInfo.name,
+              customerEmail: bookingData.contactInfo.email,
+              bookingId: bookingResult.data._id.toString(),
+              packageId: bookingData.packageId,
+              packageName: packageDetails?.title || (bookingData.packageType === 'tour' ? 'Tour Package' : 'Transfer Service'),
+              packageType: bookingData.packageType,
+              date: bookingData.date,
+              time: bookingData.time,
+              adults: bookingData.adults,
+              children: bookingData.children || 0,
+              pickupLocation: bookingData.pickupLocation,
+              total: paymentIntent.amount / 100,
+              currency: paymentIntent.currency.toUpperCase()
+            };
+
+            // Add transfer-specific details
+            if (bookingData.packageType === 'transfer' && packageDetails) {
+              emailData.from = packageDetails.from;
+              emailData.to = packageDetails.to;
+              
+              if (packageDetails.type === 'Private') {
+                emailData.isVehicleBooking = true;
+                emailData.vehicleName = packageDetails.vehicle;
+                emailData.vehicleSeatCapacity = packageDetails.seatCapacity;
+              }
+            }
+
+            // Add vehicle information for private tours
+            if (bookingData.packageType === 'tour' && packageDetails && packageDetails.type === 'private') {
+              emailData.isVehicleBooking = true;
+              emailData.vehicleName = packageDetails.vehicle;
+              emailData.vehicleSeatCapacity = packageDetails.seatCapacity;
+            }
+
+            console.log('[PAYMENT] Sending single booking confirmation email...');
+            console.log('[PAYMENT] Email recipient:', emailData.customerEmail);
+            console.log('[PAYMENT] Package:', emailData.packageName);
+            
+            // Check email configuration before attempting to send
+            const emailConfig = PaymentController.checkEmailConfiguration();
+            console.log('[PAYMENT] Email config check:', emailConfig);
+            
+            if (!emailConfig.canSendEmail) {
+              console.error('[PAYMENT] ❌ Cannot send email - configuration issues:', emailConfig.issues);
+              throw new Error(`Email configuration incomplete: ${emailConfig.issues.join(', ')}`);
+            }
+            
+            const emailService = new EmailService();
+            const emailSent = await emailService.sendBookingConfirmation(emailData);
+            
+            if (emailSent) {
+              console.log('[PAYMENT] ✅ Single booking confirmation email sent successfully');
+            } else {
+              console.error('[PAYMENT] ⚠️ Single booking confirmation email failed to send');
+            }
+          } catch (emailError) {
+            console.error('[PAYMENT] ❌ Failed to send single booking confirmation email:', emailError);
+            // Log additional debug info
+            console.error('[PAYMENT] Email error details:', {
+              customerEmail: bookingData?.contactInfo?.email,
+              packageType: bookingData?.packageType,
+              packageId: bookingData?.packageId,
+              hasBrevoKey: !!process.env.BREVO_API_KEY,
+              hasSmtpConfig: !!(process.env.SMTP_USER && process.env.SMTP_PASS)
+            });
+          }
+        }
       }
 
       if (bookingResult.success) {
