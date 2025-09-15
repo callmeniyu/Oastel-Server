@@ -2,6 +2,8 @@
 const Stripe = require('stripe');
 import { Request, Response } from 'express';
 import { EmailService } from '../services/email.service';
+// TimeSlotService used to update timeslot bookedCount; import once to avoid redeclaration
+const { TimeSlotService } = require('../services/timeSlot.service');
 
 // Validate that Stripe secret key is available
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -292,10 +294,26 @@ export class PaymentController {
             const { TimeSlotService } = require('../services/timeSlot.service');
             for (const booking of existingBookings) {
               const totalGuests = (booking.adults || 0) + (booking.children || 0);
+              
+              // Convert booking date to YYYY-MM-DD Malaysia timezone for timeslot lookup
+              let dateStr = booking.date;
+              if (booking.date instanceof Date) {
+                dateStr = booking.date.toISOString().split('T')[0];
+              } else if (typeof booking.date === 'string' && booking.date.includes('T')) {
+                dateStr = booking.date.split('T')[0];
+              } else if (typeof booking.date === 'string') {
+                const bookingDate = new Date(booking.date);
+                dateStr = bookingDate.toISOString().split('T')[0];
+              }
+              // Normalize to Malaysia timezone format using service util
+              dateStr = TimeSlotService.formatDateToMalaysiaTimezone(dateStr);
+              
+              console.log(`[PAYMENT] Converting booking date: ${booking.date} → ${dateStr}`);
+              
               await TimeSlotService.updateSlotBooking(
                 booking.packageType,
                 booking.packageId,
-                booking.date,
+                dateStr,
                 booking.time,
                 totalGuests,
                 'add'
@@ -417,10 +435,25 @@ export class PaymentController {
           try {
             const { TimeSlotService } = require('../services/timeSlot.service');
             const totalGuests = (existingBooking.adults || 0) + (existingBooking.children || 0);
+            
+            // Convert booking date to YYYY-MM-DD Malaysia timezone for timeslot lookup
+            let dateStr = existingBooking.date;
+            if (existingBooking.date instanceof Date) {
+              dateStr = existingBooking.date.toISOString().split('T')[0];
+            } else if (typeof existingBooking.date === 'string' && existingBooking.date.includes('T')) {
+              dateStr = existingBooking.date.split('T')[0];
+            } else if (typeof existingBooking.date === 'string') {
+              const bookingDate = new Date(existingBooking.date);
+              dateStr = bookingDate.toISOString().split('T')[0];
+            }
+            dateStr = TimeSlotService.formatDateToMalaysiaTimezone(dateStr);
+            
+            console.log(`[PAYMENT] Converting booking date: ${existingBooking.date} → ${dateStr}`);
+            
             await TimeSlotService.updateSlotBooking(
               existingBooking.packageType,
               existingBooking.packageId,
-              existingBooking.date,
+              dateStr,
               existingBooking.time,
               totalGuests,
               'add'
@@ -456,10 +489,25 @@ export class PaymentController {
           try {
             const { TimeSlotService } = require('../services/timeSlot.service');
             const totalGuests = (bookingData.adults || 0) + (bookingData.children || 0);
+            
+            // Convert booking date to YYYY-MM-DD Malaysia timezone for timeslot lookup
+            let dateStr = bookingData.date;
+            if (bookingData.date instanceof Date) {
+              dateStr = bookingData.date.toISOString().split('T')[0];
+            } else if (typeof bookingData.date === 'string' && bookingData.date.includes('T')) {
+              dateStr = bookingData.date.split('T')[0];
+            } else if (typeof bookingData.date === 'string') {
+              const bookingDate = new Date(bookingData.date);
+              dateStr = bookingDate.toISOString().split('T')[0];
+            }
+            dateStr = TimeSlotService.formatDateToMalaysiaTimezone(dateStr);
+            
+            console.log(`[PAYMENT] Converting booking date: ${bookingData.date} → ${dateStr}`);
+            
             await TimeSlotService.updateSlotBooking(
               bookingData.packageType,
               bookingData.packageId,
-              bookingData.date,
+              dateStr,
               bookingData.time,
               totalGuests,
               'add'

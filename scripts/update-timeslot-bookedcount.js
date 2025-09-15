@@ -11,10 +11,12 @@ if (!process.env.MONGO_URI) {
 }
 
 // === EDIT THESE VALUES ===
-const SLUG = 'mossy-forest-highland-discovery';
-const DATE = '2025-09-16';
+// Set PACKAGE_TYPE to either 'tour' or 'transfer'
+const PACKAGE_TYPE = 'tours'; // 'tour' | 'transfer'
+const SLUG = 'mossy-forest-full-day-highland-discovery';
+const DATE = '2025-09-18';
 const TIME = '08:15';
-const NEW_BOOKED_COUNT = 3;
+const NEW_BOOKED_COUNT = 2;
 // ==========================
 
 async function run() {
@@ -28,14 +30,15 @@ async function run() {
     await mongoose.connect(uri, { family: 4 });
     const db = mongoose.connection.db;
 
-    const tour = await db.collection('tours').findOne({ slug: SLUG });
+    const collName = PACKAGE_TYPE === 'transfer' ? 'transfers' : 'tours';
+    const tour = await db.collection(collName).findOne({ slug: SLUG });
     if (!tour) {
-      console.error('Tour not found for slug:', SLUG);
+      console.error('Package not found for slug in', collName + ':', SLUG);
       process.exit(2);
     }
 
     const tsColl = db.collection('timeslots');
-    const ts = await tsColl.findOne({ packageType: 'tour', packageId: tour._id, date: DATE });
+  const ts = await tsColl.findOne({ packageType: PACKAGE_TYPE, packageId: tour._id, date: DATE });
     if (!ts) {
       console.error('TimeSlot record not found for date:', DATE);
       process.exit(3);

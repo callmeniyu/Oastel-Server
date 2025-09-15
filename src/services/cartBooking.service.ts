@@ -197,7 +197,7 @@ export class CartBookingService {
                 await TimeSlotService.updateSlotBooking(
                   item.packageType,
                   item.packageId,
-                  new Date(item.selectedDate).toISOString().split('T')[0],
+                  TimeSlotService.formatDateToMalaysiaTimezone(new Date(item.selectedDate).toISOString().split('T')[0]),
                   item.selectedTime,
                   1, // one vehicle
                   "add"
@@ -215,7 +215,7 @@ export class CartBookingService {
                 await TimeSlotService.updateSlotBooking(
                   item.packageType,
                   item.packageId,
-                  new Date(item.selectedDate).toISOString().split('T')[0],
+                  TimeSlotService.formatDateToMalaysiaTimezone(new Date(item.selectedDate).toISOString().split('T')[0]),
                   item.selectedTime,
                   totalGuests,
                   "add"
@@ -235,7 +235,7 @@ export class CartBookingService {
               await TimeSlotService.updateSlotBooking(
                 item.packageType,
                 item.packageId,
-                new Date(item.selectedDate).toISOString().split('T')[0],
+                TimeSlotService.formatDateToMalaysiaTimezone(new Date(item.selectedDate).toISOString().split('T')[0]),
                 item.selectedTime,
                 totalGuests,
                 "add"

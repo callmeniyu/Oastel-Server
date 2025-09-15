@@ -14,8 +14,10 @@ const mongoose = require('mongoose');
 const { ObjectId } = require('mongodb');
 
 // === EDIT THESE VALUES ===
-const SLUG = 'mossy-forest-highland-discovery';
-const DATE = '2025-09-16'; // YYYY-MM-DD
+// Set PACKAGE_TYPE to either 'tour' or 'transfer' depending on which collection the slug lives in
+const PACKAGE_TYPE = 'transfer'; // 'tour' | 'transfer'
+const SLUG = 'cameron-highlands-to-taman-negara-minivan';
+const DATE = '2025-09-17'; // YYYY-MM-DD
 // ==========================
 
 async function run() {
@@ -42,34 +44,35 @@ async function run() {
 
     const db = mongoose.connection.db;
 
-    // Find tour by slug in the native collection
-    const tour = await db.collection('tours').findOne({ slug: SLUG });
-    if (!tour) {
-      console.error('Package not found for slug:', SLUG);
+    // Find package by slug in the appropriate native collection
+    const collName = PACKAGE_TYPE === 'transfer' ? 'transfers' : 'tours';
+    const pkg = await db.collection(collName).findOne({ slug: SLUG });
+    if (!pkg) {
+      console.error('Package not found for slug in', collName + ':', SLUG);
       await mongoose.disconnect();
       process.exit(2);
     }
 
     console.log('📦 Package Details:');
-    console.log('   Title:', tour.title);
-    console.log('   MinimumPerson:', tour.minimumPerson);
-    console.log('   Type:', tour.type);
-    console.log('   MaximumPerson:', tour.maximumPerson);
+    console.log('   Title:', pkg.title || pkg.name);
+    console.log('   MinimumPerson:', pkg.minimumPerson);
+    console.log('   Type:', pkg.type);
+    console.log('   MaximumPerson:', pkg.maximumPerson);
     console.log('');
 
-    // Determine a safe ObjectId for packageId (tour._id may already be an ObjectId or a string)
+    // Determine a safe ObjectId for packageId (pkg._id may already be an ObjectId or a string)
     let packageId;
     try {
-      packageId = mongoose.Types.ObjectId(tour._id);
+      packageId = mongoose.Types.ObjectId(pkg._id);
     } catch (e) {
       // fallback to using the raw value
-      packageId = tour._id;
+      packageId = pkg._id;
     }
 
     // Query timeslots collection for matching packageId and date
     const timeslots = await db
       .collection('timeslots')
-      .find({ packageType: 'tour', packageId: packageId, date: DATE })
+      .find({ packageType: PACKAGE_TYPE, packageId: packageId, date: DATE })
       .toArray();
 
     if (!timeslots || timeslots.length === 0) {

@@ -117,7 +117,7 @@ export async function createBooking(req: Request, res: Response) {
         await TimeSlotService.updateSlotBooking(
           packageType,
           new Types.ObjectId(packageId),
-          date,
+          TimeSlotService.formatDateToMalaysiaTimezone(date),
           time,
           totalGuests,
           'add'
