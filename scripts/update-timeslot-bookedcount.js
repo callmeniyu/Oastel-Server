@@ -12,7 +12,7 @@ if (!process.env.MONGO_URI) {
 
 // === EDIT THESE VALUES ===
 // Set PACKAGE_TYPE to either 'tour' or 'transfer'
-const PACKAGE_TYPE = 'tours'; // 'tour' | 'transfer'
+const PACKAGE_TYPE = 'tour'; // 'tour' | 'transfer'
 const SLUG = 'mossy-forest-full-day-highland-discovery';
 const DATE = '2025-09-18';
 const TIME = '08:15';
@@ -30,17 +30,37 @@ async function run() {
     await mongoose.connect(uri, { family: 4 });
     const db = mongoose.connection.db;
 
-    const collName = PACKAGE_TYPE === 'transfer' ? 'transfers' : 'tours';
-    const tour = await db.collection(collName).findOne({ slug: SLUG });
+  const collName = PACKAGE_TYPE === 'transfer' ? 'transfers' : 'tours';
+  console.log(`Searching for package slug='${SLUG}' in collection='${collName}'`);
+  const tour = await db.collection(collName).findOne({ slug: SLUG });
     if (!tour) {
       console.error('Package not found for slug in', collName + ':', SLUG);
       process.exit(2);
     }
 
     const tsColl = db.collection('timeslots');
-  const ts = await tsColl.findOne({ packageType: PACKAGE_TYPE, packageId: tour._id, date: DATE });
+
+    // Normalize date to Malaysia timezone YYYY-MM-DD using TimeSlotService if available
+    let TimeSlotService;
+    try {
+      TimeSlotService = require('../dist/services/timeSlot.service').TimeSlotService;
+    } catch (e) {
+      TimeSlotService = require('../src/services/timeSlot.service').TimeSlotService;
+    }
+
+    // Accept DD/MM/YYYY or YYYY-MM-DD
+    let dateStr = DATE;
+    if (DATE.includes('/')) {
+      const [d, m, y] = DATE.split('/').map(s => s.padStart(2, '0'));
+      dateStr = `${y}-${m}-${d}`;
+    }
+    dateStr = TimeSlotService.formatDateToMalaysiaTimezone(dateStr);
+
+    console.log(`Looking up timeslot for date='${dateStr}', packageType='${PACKAGE_TYPE}'`);
+
+    const ts = await tsColl.findOne({ packageType: PACKAGE_TYPE, packageId: tour._id, date: dateStr });
     if (!ts) {
-      console.error('TimeSlot record not found for date:', DATE);
+      console.error('TimeSlot record not found for date:', dateStr);
       process.exit(3);
     }
 

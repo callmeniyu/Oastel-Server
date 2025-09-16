@@ -1,7 +1,8 @@
 // simulate-booking.js
 // Usage:
-//   node simulate-booking.js <slug> <date> <time> [adults] [children]
+//   node simulate-booking.js <slug> <date> <time> [adults] [children] [--send-email]
 // date can be in YYYY-MM-DD or DD/MM/YYYY
+// --send-email: Send confirmation email using Brevo (requires BREVO_API_KEY in .env)
 
 const dotenv = require('dotenv');
 const path = require('path');
@@ -28,7 +29,7 @@ async function parseDateInput(input) {
 async function run() {
   const args = process.argv.slice(2);
   if (args.length < 3) {
-    console.error('Usage: node simulate-booking.js <slug> <date> <time> [adults] [children]');
+    console.error('Usage: node simulate-booking.js <slug> <date> <time> [adults] [children] [--send-email]');
     process.exit(1);
   }
 
@@ -37,6 +38,7 @@ async function run() {
   const TIME = args[2];
   const ADULTS = parseInt(args[3] || '1', 10);
   const CHILDREN = parseInt(args[4] || '0', 10);
+  const SEND_EMAIL = args.includes('--send-email');
 
   const uri = process.env.MONGO_URI;
   if (!uri) {
@@ -139,6 +141,46 @@ async function run() {
       console.log('Updated package bookedCount, matched:', incResult.matchedCount, 'modified:', incResult.modifiedCount);
     } catch (pkgErr) {
       console.error('Failed to increment package bookedCount:', pkgErr);
+    }
+
+    // Optionally send confirmation email using Brevo
+    if (SEND_EMAIL) {
+      try {
+        console.log('Sending confirmation email...');
+        let EmailService;
+        try {
+          EmailService = require('../dist/services/email.service').EmailService;
+        } catch (e) {
+          EmailService = require('../src/services/email.service').EmailService;
+        }
+
+        const emailData = {
+          customerName: bookingDoc.contactInfo.name,
+          customerEmail: bookingDoc.contactInfo.email,
+          bookingId: insertResult.insertedId.toString(),
+          packageId: pkg._id.toString(),
+          packageName: pkg.title || pkg.name || 'Package',
+          packageType: packageType,
+          date: normalizedDate,
+          time: TIME,
+          adults: ADULTS,
+          children: CHILDREN,
+          pickupLocation: bookingDoc.pickupLocation,
+          total: bookingDoc.total,
+          currency: bookingDoc.paymentInfo.currency
+        };
+
+        const emailService = new EmailService();
+        const emailSent = await emailService.sendBookingConfirmation(emailData);
+
+        if (emailSent) {
+          console.log('✅ Confirmation email sent successfully');
+        } else {
+          console.log('⚠️ Confirmation email failed to send');
+        }
+      } catch (emailErr) {
+        console.error('❌ Failed to send confirmation email:', emailErr.message || emailErr);
+      }
     }
 
     // Fetch and print timeslot for the date and time
