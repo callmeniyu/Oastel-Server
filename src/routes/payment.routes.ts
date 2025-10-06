@@ -12,6 +12,9 @@ router.post('/create-cart-payment-intent', PaymentController.createCartPaymentIn
 // Confirm payment and create booking
 router.post('/confirm-payment', PaymentController.confirmPayment);
 
+// Cancel payment intent
+router.post('/cancel-payment-intent', PaymentController.cancelPaymentIntent);
+
 // Get payment status
 router.get('/status/:paymentIntentId', PaymentController.getPaymentStatus);
 

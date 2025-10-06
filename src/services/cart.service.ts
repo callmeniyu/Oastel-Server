@@ -9,9 +9,17 @@ export class CartService {
   async getCart(userEmail: string): Promise<ICart> {
     try {
       // Find user by email
-      const user = await User.findOne({ email: userEmail }).select('_id').lean();
+      let user: any = await User.findOne({ email: userEmail }).select('_id name email');
       if (!user) {
-        throw new Error('User not found');
+        // Auto-create minimal user record if it doesn't exist (helps when auth provider created session but no local user doc)
+        const localPart = (userEmail && userEmail.split('@')?.[0]) || 'guest';
+        const defaultName = localPart.length >= 2 ? localPart : `guest${Date.now()}`;
+        try {
+          user = await User.create({ email: userEmail, name: defaultName });
+        } catch (createErr) {
+          console.error('Failed to auto-create user:', createErr);
+          throw new Error('User not found');
+        }
       }
 
       // Find or create cart

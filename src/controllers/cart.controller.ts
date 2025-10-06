@@ -65,45 +65,46 @@ export class CartController {
         children,
         pickupLocation
       } = req.body;
+      // Validation with aggregated errors for better diagnostics
+      const validationErrors: string[] = [];
+      if (!userEmail) validationErrors.push('userEmail is required');
+      if (!packageId) validationErrors.push('packageId is required');
+      if (!packageType) validationErrors.push('packageType is required');
+      if (!selectedDate) validationErrors.push('selectedDate is required');
+      if (!selectedTime) validationErrors.push('selectedTime is required');
+      if (adults === undefined || adults === null) validationErrors.push('adults is required');
 
-      // Validation
-      if (!userEmail || !packageId || !packageType || !selectedDate || !selectedTime || !adults) {
-        return res.status(400).json({
-          success: false,
-          message: 'Missing required fields'
-        });
+      if (packageType && !['tour', 'transfer'].includes(packageType)) {
+        validationErrors.push('Invalid package type');
       }
 
-      if (!['tour', 'transfer'].includes(packageType)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid package type'
-        });
+      if (adults !== undefined && (adults < 1 || adults > 20)) {
+        validationErrors.push('Adults count must be between 1 and 20');
       }
 
-      if (adults < 1 || adults > 20) {
-        return res.status(400).json({
-          success: false,
-          message: 'Adults count must be between 1 and 20'
-        });
+      if (children !== undefined && (children < 0 || children > 10)) {
+        validationErrors.push('Children count must be between 0 and 10');
       }
 
-      if (children < 0 || children > 10) {
-        return res.status(400).json({
-          success: false,
-          message: 'Children count must be between 0 and 10'
-        });
+      // Check if selected date is not in the past (only when provided)
+      if (selectedDate) {
+        const selectedDateObj = new Date(selectedDate + 'T12:00:00.000Z'); // Use noon UTC to avoid timezone issues
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (selectedDateObj < today) {
+          validationErrors.push('Selected date cannot be in the past');
+        }
       }
 
-      // Check if selected date is not in the past
-      const selectedDateObj = new Date(selectedDate + 'T12:00:00.000Z'); // Use noon UTC to avoid timezone issues
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      if (selectedDateObj < today) {
+      if (validationErrors.length > 0) {
+        // Log the body and validation errors for debugging
+        console.warn('addToCart validation failed', {
+          body: req.body,
+          errors: validationErrors,
+        });
         return res.status(400).json({
           success: false,
-          message: 'Selected date cannot be in the past'
+          message: validationErrors.join('; '),
         });
       }
 
@@ -124,9 +125,14 @@ export class CartController {
       });
     } catch (error: any) {
       console.error('Error adding to cart:', error);
+      const msg = error?.message || 'Failed to add item to cart';
+      // For known client-caused errors, return 400 so the frontend can show the message
+      if (msg.includes('User not found') || msg.includes('Package not found')) {
+        return res.status(400).json({ success: false, message: msg });
+      }
       res.status(500).json({
         success: false,
-        message: error.message || 'Failed to add item to cart'
+        message: msg
       });
     }
   }

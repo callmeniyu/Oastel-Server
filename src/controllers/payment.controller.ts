@@ -644,6 +644,64 @@ export class PaymentController {
     }
   }
 
+  // Cancel payment intent to avoid incomplete status in Stripe
+  static async cancelPaymentIntent(req: Request, res: Response) {
+    try {
+      console.log('[PAYMENT] Canceling payment intent:', req.body);
+
+      const { paymentIntentId } = req.body;
+
+      if (!paymentIntentId) {
+        console.error('[PAYMENT] Missing payment intent ID');
+        return res.status(400).json({
+          success: false,
+          error: 'Payment intent ID is required'
+        });
+      }
+
+      // Retrieve payment intent to check its current status
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+      console.log('[PAYMENT] Current payment intent status:', paymentIntent.status);
+
+      // Only cancel if the payment intent is in a cancelable state
+      if (paymentIntent.status === 'requires_payment_method' || 
+          paymentIntent.status === 'requires_confirmation' ||
+          paymentIntent.status === 'requires_action') {
+        
+        const canceledPaymentIntent = await stripe.paymentIntents.cancel(paymentIntentId);
+        
+        console.log('[PAYMENT] Payment intent canceled successfully:', canceledPaymentIntent.id);
+
+        res.json({
+          success: true,
+          data: {
+            paymentIntentId: canceledPaymentIntent.id,
+            status: canceledPaymentIntent.status
+          }
+        });
+      } else {
+        console.log('[PAYMENT] Payment intent cannot be canceled, current status:', paymentIntent.status);
+        
+        res.json({
+          success: true,
+          message: `Payment intent is in ${paymentIntent.status} status and cannot be canceled`,
+          data: {
+            paymentIntentId: paymentIntent.id,
+            status: paymentIntent.status
+          }
+        });
+      }
+
+    } catch (error: any) {
+      console.error('[PAYMENT] Error canceling payment intent:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to cancel payment intent'
+      });
+    }
+  }
+
   // Handle webhook events from Stripe
   static async handleWebhook(req: Request, res: Response) {
     const sig = req.headers['stripe-signature'] as string;
