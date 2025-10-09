@@ -65,6 +65,37 @@ class BookingService {
         throw new Error("Package not found");
       }
 
+      // First, try to find or create a user for this email
+      let userId: mongoose.Types.ObjectId | null = null;
+      
+      try {
+        const UserModel = mongoose.model('User');
+        let user = await UserModel.findOne({ email: data.contactInfo.email });
+        
+        if (!user) {
+          // Create new user for this booking
+          console.log(`Creating new user for email: ${data.contactInfo.email}`);
+          user = new UserModel({
+            name: data.contactInfo.name,
+            email: data.contactInfo.email,
+            phone: data.contactInfo.phone,
+            role: 'user',
+            isVerified: true, // Mark as verified since they're making a booking
+            createdAt: new Date()
+          });
+          await user.save();
+          console.log(`✅ Created user with ID: ${user._id}`);
+        } else {
+          console.log(`👤 Found existing user with ID: ${user._id}`);
+        }
+        
+        userId = user._id;
+      } catch (userError) {
+        console.error('Error creating/finding user:', userError);
+        // Continue without userId if user creation fails
+        console.log('⚠️ Continuing with guest booking (no user ID)');
+      }
+
   const totalGuests = data.adults + data.children;
       
       // Check slot availability using TimeSlotService (includes minimum person validation)
@@ -87,9 +118,9 @@ class BookingService {
         throw new Error(availability.reason || "Time slot not available");
       }
 
-      // Create booking without userId and slotId (for guest bookings using dynamic slots)
+      // Create booking with userId (if found/created) and slotId (for guest bookings using dynamic slots)
       const booking = new BookingModel({
-        userId: null, // Guest booking
+        userId: userId, // Link to user if found/created
         packageType: data.packageType,
         packageId: data.packageId,
         slotId: null, // No specific slot for guest bookings using dynamic slots
@@ -98,7 +129,7 @@ class BookingService {
         adults: data.adults,
         children: data.children,
         pickupLocation: data.pickupLocation,
-        status: "pending",
+        status: data.paymentInfo.paymentStatus === 'succeeded' ? 'confirmed' : 'pending', // Auto-confirm if payment succeeded
         contactInfo: data.contactInfo,
         paymentInfo: data.paymentInfo,
         subtotal: data.subtotal,
