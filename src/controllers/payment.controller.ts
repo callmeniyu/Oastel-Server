@@ -89,6 +89,8 @@ export class PaymentController {
           bookingType: 'single',
           packageType: bookingData.packageType || '',
           packageId: bookingData.packageId || '',
+          // Include bookingId in metadata if provided so webhooks can map back
+          bookingId: bookingData._id || bookingData.bookingId || '',
           date: bookingData.date || '',
           time: bookingData.time || '',
           adults: bookingData.adults?.toString() || '0',
@@ -245,7 +247,10 @@ export class PaymentController {
         console.log('[PAYMENT] Cart booking - finding existing bookings...');
         
         const existingBookings = await Booking.find({
-          'paymentInfo.paymentIntentId': paymentIntent.id,
+          $or: [
+            { 'paymentInfo.stripePaymentIntentId': paymentIntent.id },
+            { 'paymentInfo.paymentIntentId': paymentIntent.id }
+          ],
           'paymentInfo.paymentStatus': 'pending'
         });
 
@@ -278,11 +283,13 @@ export class PaymentController {
         } else {
           // Update existing bookings payment status AND update slot counts
           const updateResult = await Booking.updateMany(
-            { 'paymentInfo.paymentIntentId': paymentIntent.id },
+            { $or: [ { 'paymentInfo.stripePaymentIntentId': paymentIntent.id }, { 'paymentInfo.paymentIntentId': paymentIntent.id } ] },
             { 
               $set: { 
                 'paymentInfo.paymentStatus': 'succeeded',
-                'paymentInfo.paymentMethod': 'stripe'
+                'paymentInfo.paymentMethod': 'stripe',
+                'paymentInfo.stripePaymentIntentId': paymentIntent.id,
+                'paymentInfo.paymentIntentId': paymentIntent.id
               }
             }
           );

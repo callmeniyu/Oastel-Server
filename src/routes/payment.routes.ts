@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { PaymentController } from '../controllers/payment.controller';
+import { PaymentCleanupService } from '../services/paymentCleanup.service';
 
 const router = Router();
 
@@ -17,6 +18,9 @@ router.post('/cancel-payment-intent', PaymentController.cancelPaymentIntent);
 
 // Get payment status
 router.get('/status/:paymentIntentId', PaymentController.getPaymentStatus);
+
+// Manual cleanup of abandoned payment intents
+router.post('/cleanup-abandoned', PaymentCleanupService.triggerManualCleanup);
 
 // Stripe webhook endpoint
 router.post('/webhook', PaymentController.handleWebhook);

@@ -1,6 +1,7 @@
 import BookingModel, { Booking } from "../models/Booking";
 import TimeSlotModel from "../models/TimeSlot";
 import { TimeSlotService } from "./timeSlot.service";
+import { EmailService } from "./email.service";
 import mongoose from "mongoose";
 
 class BookingService {
@@ -131,7 +132,12 @@ class BookingService {
         pickupLocation: data.pickupLocation,
         status: data.paymentInfo.paymentStatus === 'succeeded' ? 'confirmed' : 'pending', // Auto-confirm if payment succeeded
         contactInfo: data.contactInfo,
-        paymentInfo: data.paymentInfo,
+        // Persist paymentInfo and any Stripe identifiers so webhooks can reconcile
+        paymentInfo: {
+          ...data.paymentInfo,
+          stripePaymentIntentId: (data.paymentInfo as any)?.stripePaymentIntentId || null,
+          stripeSessionId: (data.paymentInfo as any)?.stripeSessionId || null,
+        },
         subtotal: data.subtotal,
         total: data.total,
         firstBookingMinimum: false, // Can be calculated based on business logic
@@ -193,6 +199,105 @@ class BookingService {
     } catch (error) {
       console.error("Error creating booking:", error);
       throw error;
+    }
+  }
+
+  // Idempotent handler for Stripe successful payments
+  async handleStripeSuccess(opts: { bookingId?: string; paymentIntentId?: string; sessionId?: string; amount?: number; currency?: string; }) {
+    try {
+      const filter: any = {};
+      if (opts.bookingId) filter._id = opts.bookingId;
+      if (opts.paymentIntentId) filter['paymentInfo.stripePaymentIntentId'] = opts.paymentIntentId;
+      if (opts.sessionId) filter['paymentInfo.stripeSessionId'] = opts.sessionId;
+
+      // Only update if not already marked succeeded
+      const update: any = {
+        'paymentInfo.paymentStatus': 'succeeded',
+        status: 'confirmed',
+        'paymentInfo.updatedAt': new Date(),
+      };
+
+      if (typeof opts.amount === 'number') update['paymentInfo.amount'] = opts.amount;
+      if (opts.currency) update['paymentInfo.currency'] = opts.currency;
+
+      const booking = await BookingModel.findOneAndUpdate(
+        { ...filter, $or: [ { 'paymentInfo.paymentStatus': { $exists: false } }, { 'paymentInfo.paymentStatus': { $ne: 'succeeded' } } ] },
+        { $set: update },
+        { new: true }
+      ).populate('packageId');
+
+      if (booking) {
+        console.log(`✅ Booking ${booking._id} marked confirmed via Stripe event`);
+        
+        // Send confirmation email using existing Brevo service
+        try {
+          const emailService = new EmailService();
+          
+          // Prepare email data for existing email service
+          const emailData = {
+            customerName: booking.contactInfo.name,
+            customerEmail: booking.contactInfo.email,
+            bookingId: booking._id.toString(),
+            packageId: booking.packageId._id.toString(),
+            packageName: booking.packageId.name,
+            packageType: booking.packageType,
+            from: booking.from,
+            to: booking.to,
+            date: booking.date.toISOString().split('T')[0], // Format date as YYYY-MM-DD
+            time: booking.time,
+            adults: booking.adults,
+            children: booking.children,
+            pickupLocation: booking.pickupLocation,
+            pickupGuidelines: booking.packageId.pickupGuidelines,
+            total: booking.total,
+            currency: booking.paymentInfo.currency || 'MYR',
+            isVehicleBooking: booking.isVehicleBooking,
+            vehicleName: booking.vehicleName,
+            vehicleSeatCapacity: booking.vehicleSeatCapacity,
+          };
+          
+          const emailSent = await emailService.sendBookingConfirmation(emailData);
+          if (emailSent) {
+            console.log(`📧 Confirmation email sent to ${booking.contactInfo.email} for booking ${booking._id}`);
+          } else {
+            console.warn(`⚠️ Failed to send confirmation email for booking ${booking._id}`);
+          }
+        } catch (emailError) {
+          console.error(`❌ Error sending confirmation email for booking ${booking._id}:`, emailError);
+          // Don't fail the payment processing if email fails
+        }
+      }
+
+      return booking;
+    } catch (err) {
+      console.error('Error in handleStripeSuccess:', err);
+      throw err;
+    }
+  }
+
+  // Idempotent handler for Stripe failed/cancelled payments
+  async handleStripeFailure(opts: { bookingId?: string; paymentIntentId?: string; reason?: string; }) {
+    try {
+      const filter: any = {};
+      if (opts.bookingId) filter._id = opts.bookingId;
+      if (opts.paymentIntentId) filter['paymentInfo.stripePaymentIntentId'] = opts.paymentIntentId;
+
+      const update: any = {
+        'paymentInfo.paymentStatus': 'failed',
+        'paymentInfo.failedReason': opts.reason || 'payment_failed',
+        status: 'cancelled',
+        'paymentInfo.updatedAt': new Date(),
+      };
+
+      const booking = await BookingModel.findOneAndUpdate(filter, { $set: update }, { new: true });
+      if (booking) {
+        console.log(`⚠️ Booking ${booking._id} marked failed/cancelled via Stripe event`);
+        // Optionally notify customer/admin
+      }
+      return booking;
+    } catch (err) {
+      console.error('Error in handleStripeFailure:', err);
+      throw err;
     }
   }
 

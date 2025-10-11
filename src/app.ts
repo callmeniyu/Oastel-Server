@@ -3,6 +3,7 @@ import express from "express"
 import cors from "cors"
 import morgan from "morgan"
 import helmet from "helmet"
+import webhookRoutes from "./routes/webhook.routes"
 import tourRoutes from "./routes/tour.routes"
 import transferRoutes from "./routes/transfer.routes"
 import bookingRoutes from "./routes/booking.routes"
@@ -18,6 +19,7 @@ import vehicleRoutes from "./routes/vehicle.routes"
 import rollingTimeslotRoutes from "./routes/rollingTimeslot.routes"
 import paymentRoutes from "./routes/payment.routes"
 import paymentDebugRoutes from "./routes/paymentDebug.routes"
+import { PaymentCleanupService } from "./services/paymentCleanup.service"
 
 const app = express()
 
@@ -26,6 +28,11 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }))
 app.use(morgan("dev"))
+
+// Stripe webhook needs raw body for signature verification. Mount webhook route with raw middleware.
+app.use('/webhook', express.raw({ type: 'application/json' }), webhookRoutes);
+
+// Regular JSON body parsing for other routes
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
@@ -50,5 +57,11 @@ app.use("/api/payments", paymentRoutes)
 // Payment debugging
 app.use("/api/payment-debug", paymentDebugRoutes)
 
+// Start automatic payment intent cleanup service
+// This prevents abandoned payment intents from showing as "incomplete" in Stripe dashboard
+if (process.env.NODE_ENV !== 'test') {
+  // Clean up payment intents older than 15 minutes, run every 30 minutes
+  PaymentCleanupService.startAutoCleanup(30, 15);
+}
 
 export default app
