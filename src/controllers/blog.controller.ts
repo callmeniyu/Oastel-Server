@@ -69,6 +69,7 @@ export const getBlogs = async (req: Request, res: Response) => {
         const category = req.query.category as string
         const sortBy = (req.query.sortBy as string) || "createdAt"
         const sortOrder = (req.query.sortOrder as string) || "desc"
+        const featuredOnly = req.query.featured === "true"
 
         const skip = (page - 1) * limit
         const query: any = {}
@@ -81,6 +82,12 @@ export const getBlogs = async (req: Request, res: Response) => {
         // Build sort object
         const sort: any = {}
         sort[sortBy] = sortOrder === "desc" ? -1 : 1
+
+        // If requesting featured blogs only, ignore pagination and return top featured by rank
+        if (featuredOnly) {
+            const featured = await Blog.find({ featuredRank: { $gt: 0 } }).sort({ featuredRank: 1 }).limit(3)
+            return res.json({ success: true, data: featured })
+        }
 
         const blogs = await Blog.find(query).sort(sort).skip(skip).limit(limit)
 
@@ -263,5 +270,56 @@ export const incrementBlogViews = async (req: Request, res: Response) => {
             success: false,
             message: "Internal server error",
         })
+    }
+}
+
+// Set or unset featured rank for a blog. Body: { featuredRank: number }
+export const setBlogFeature = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params
+        const { featuredRank } = req.body
+
+        if (typeof featuredRank !== 'number' || featuredRank < 0 || featuredRank > 3) {
+            return res.status(400).json({ success: false, message: 'featuredRank must be a number between 0 and 3' })
+        }
+
+        const blog = await Blog.findById(id)
+        if (!blog) {
+            return res.status(404).json({ success: false, message: 'Blog not found' })
+        }
+
+        // If setting to 0 -> unset feature for this blog
+        if (featuredRank === 0) {
+            blog.featuredRank = 0
+            await blog.save()
+            return res.json({ success: true, message: 'Blog unfeatured', data: blog })
+        }
+
+        // Ensure unique ranks: if another blog already has this rank, swap or set it to 0
+        const existing = await Blog.findOne({ featuredRank })
+        if (existing && (existing as any)._id.toString() !== id) {
+            // Unset existing or swap ranks. We'll unset the existing to avoid collisions.
+            (existing as any).featuredRank = 0
+            await (existing as any).save()
+        }
+
+    blog.featuredRank = featuredRank
+    await blog.save()
+
+        // Ensure at most 3 featured blogs: if more than 3 exist, remove highest rank >3 (shouldn't happen)
+        const featuredCount = await Blog.countDocuments({ featuredRank: { $gt: 0 } })
+        if (featuredCount > 3) {
+            // Remove extras by clearing the highest featuredRank entries beyond the first 3
+            const extras = await Blog.find({ featuredRank: { $gt: 0 } }).sort({ featuredRank: 1 }).skip(3)
+            for (const ex of extras) {
+                (ex as any).featuredRank = 0
+                await (ex as any).save()
+            }
+        }
+
+        return res.json({ success: true, message: 'Blog featured updated', data: blog })
+    } catch (error) {
+        console.error('Error setting blog feature:', error)
+        res.status(500).json({ success: false, message: 'Internal server error' })
     }
 }

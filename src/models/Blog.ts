@@ -9,6 +9,7 @@ export interface BlogType extends Document {
     views: number
     publishDate: Date
     content: string
+    featuredRank: number // 0 = not featured, 1..3 = featured positions
     createdAt: Date
     updatedAt: Date
 }
@@ -28,6 +29,7 @@ const BlogSchema = new Schema<BlogType>(
         views: { type: Number, default: 0 },
         publishDate: { type: Date, required: true },
         content: { type: String, required: true },
+        featuredRank: { type: Number, default: 0, index: true },
     },
     {
         timestamps: true,

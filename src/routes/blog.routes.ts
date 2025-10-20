@@ -7,6 +7,7 @@ import {
     updateBlog,
     deleteBlog,
     incrementBlogViews,
+    setBlogFeature,
 } from "../controllers/blog.controller"
 
 const router = Router()
@@ -25,6 +26,9 @@ router.get("/slug/:slug", getBlogBySlug)
 
 // Update blog
 router.put("/:id", updateBlog)
+
+// Set featured rank
+router.patch("/:id/feature", setBlogFeature)
 
 // Delete blog
 router.delete("/:id", deleteBlog)
