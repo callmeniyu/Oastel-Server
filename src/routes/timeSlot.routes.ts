@@ -9,7 +9,8 @@ import {
     deleteSlotsForPackage,
     debugTimeSlots,
     getServerDateTime,
-    toggleSlotAvailability
+    toggleSlotAvailability,
+    updateSlotMinimumPerson
 } from "../controllers/timeSlot.controller"
 
 const router = Router()
@@ -25,6 +26,9 @@ router.get("/available", getAvailableSlots)
 
 // Toggle slot availability (enable/disable specific time slot)
 router.put("/toggle-availability", toggleSlotAvailability)
+
+// Update minimum person for a specific time slot
+router.put("/minimum-person", updateSlotMinimumPerson)
 
 // Get server's Malaysia timezone date and time
 router.get("/server-datetime", getServerDateTime)

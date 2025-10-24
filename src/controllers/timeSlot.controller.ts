@@ -444,6 +444,88 @@ export const debugTimeSlots = async (req: Request, res: Response) => {
 }
 
 /**
+ * Update minimum person for a specific time slot
+ */
+export const updateSlotMinimumPerson = async (req: Request, res: Response) => {
+    try {
+        const { packageType, packageId, date, time, minimumPerson } = req.body
+
+        if (!packageType || !packageId || !date || !time || minimumPerson === undefined) {
+            return res.status(400).json({
+                success: false,
+                message: "packageType, packageId, date, time, and minimumPerson are required"
+            })
+        }
+
+        if (!["tour", "transfer"].includes(packageType)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid packageType. Must be 'tour' or 'transfer'"
+            })
+        }
+
+        if (typeof minimumPerson !== 'number' || minimumPerson < 1) {
+            return res.status(400).json({
+                success: false,
+                message: "minimumPerson must be a positive number"
+            })
+        }
+
+        // Import TimeSlot model
+        const TimeSlot = (await import("../models/TimeSlot")).default
+
+        // Find the time slot document and update the specific slot
+        const timeSlotDoc = await TimeSlot.findOne({
+            packageType,
+            packageId: new Types.ObjectId(packageId),
+            date
+        })
+
+        if (!timeSlotDoc) {
+            return res.status(404).json({
+                success: false,
+                message: "Time slot document not found"
+            })
+        }
+
+        // Find the specific slot within the document
+        const slotIndex = timeSlotDoc.slots.findIndex(slot => slot.time === time)
+        
+        if (slotIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: "Specific time slot not found"
+            })
+        }
+
+        // Update the minimum person for the specific slot
+        timeSlotDoc.slots[slotIndex].minimumPerson = minimumPerson
+        
+        // Save the document
+        await timeSlotDoc.save()
+
+        res.json({
+            success: true,
+            message: "Minimum person updated successfully",
+            data: {
+                packageType,
+                packageId,
+                date,
+                time,
+                minimumPerson
+            }
+        })
+    } catch (error: any) {
+        console.error("Error updating slot minimum person:", error)
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message
+        })
+    }
+}
+
+/**
  * Get server's Malaysia timezone date and time
  */
 export const getServerDateTime = async (req: Request, res: Response) => {
