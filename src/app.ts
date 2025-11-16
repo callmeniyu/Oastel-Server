@@ -57,11 +57,10 @@ app.use("/api/payments", paymentRoutes)
 // Payment debugging
 app.use("/api/payment-debug", paymentDebugRoutes)
 
-// Start automatic payment intent cleanup service
-// This prevents abandoned payment intents from showing as "incomplete" in Stripe dashboard
-if (process.env.NODE_ENV !== 'test') {
-  // Clean up payment intents older than 15 minutes, run every 30 minutes
-  PaymentCleanupService.startAutoCleanup(30, 15);
-}
+// Automatic payment cleanup disabled - can be triggered manually via API if needed
+// Manual cleanup endpoint: POST /api/payment/cleanup-abandoned
+// if (process.env.NODE_ENV !== 'test') {
+//   PaymentCleanupService.startAutoCleanup(30, 15);
+// }
 
 export default app
