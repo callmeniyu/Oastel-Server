@@ -4,7 +4,6 @@ import Tour, { TourType } from "../models/Tour"
 import Vehicle from "../models/Vehicle"
 import { generateSlug } from "../utils/generateSlug"
 import { TimeSlotService } from "../services/timeSlot.service"
-import { revalidatePath } from "next/cache"
 
 export const createTour = async (req: Request, res: Response) => {
     try {
@@ -479,13 +478,6 @@ export const toggleTourAvailability = async (req: Request, res: Response) => {
             message: `Tour ${isAvailable ? 'enabled' : 'disabled'} successfully`,
             data: tour,
         })
-
-        // Revalidate the tour detail page cache
-        try {
-            revalidatePath(`/tours/${tour.slug}`)
-        } catch (revalidateError) {
-            console.warn("Failed to revalidate tour page:", revalidateError)
-        }
     } catch (error: any) {
         console.error("Error toggling tour availability:", error)
         res.status(500).json({

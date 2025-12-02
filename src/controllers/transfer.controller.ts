@@ -4,7 +4,6 @@ import Transfer, { TransferType } from "../models/Transfer"
 import Vehicle from "../models/Vehicle"
 import { generateSlug } from "../utils/generateSlug"
 import { TimeSlotService } from "../services/timeSlot.service"
-import { revalidatePath } from "next/cache"
 
 export const createTransfer = async (req: Request, res: Response) => {
     try {
@@ -545,13 +544,6 @@ export const toggleTransferAvailability = async (req: Request, res: Response) =>
             message: `Transfer ${isAvailable ? 'enabled' : 'disabled'} successfully`,
             data: transfer,
         })
-
-        // Revalidate the transfer detail page cache
-        try {
-            revalidatePath(`/transfers/${transfer.slug}`)
-        } catch (revalidateError) {
-            console.warn("Failed to revalidate transfer page:", revalidateError)
-        }
     } catch (error: any) {
         console.error("Error toggling transfer availability:", error)
         res.status(500).json({
