@@ -513,6 +513,46 @@ export const checkSlugAvailability = async (req: Request, res: Response) => {
     }
 }
 
+// Toggle transfer availability (enable/disable booking)
+export const toggleTransferAvailability = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params
+        const { isAvailable } = req.body
+
+        if (typeof isAvailable !== 'boolean') {
+            return res.status(400).json({
+                success: false,
+                message: "isAvailable must be a boolean value",
+            })
+        }
+
+        const transfer = await Transfer.findByIdAndUpdate(
+            id,
+            { isAvailable },
+            { new: true, runValidators: true }
+        )
+
+        if (!transfer) {
+            return res.status(404).json({
+                success: false,
+                message: "Transfer not found",
+            })
+        }
+
+        res.json({
+            success: true,
+            message: `Transfer ${isAvailable ? 'enabled' : 'disabled'} successfully`,
+            data: transfer,
+        })
+    } catch (error: any) {
+        console.error("Error toggling transfer availability:", error)
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        })
+    }
+}
+
 export const getVehicles = async (req: Request, res: Response) => {
     try {
         // Get unique vehicles from private transfers

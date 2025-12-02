@@ -10,6 +10,7 @@ import {
     checkSlugAvailability,
     getVehicles,
     getLastTransfer,
+    toggleTransferAvailability,
 } from "../controllers/transfer.controller"
 
 const router = Router()
@@ -40,6 +41,9 @@ router.put("/:id", updateTransfer)
 
 // Update transfer status (partial update)
 router.patch("/:id", updateTransferStatus)
+
+// Toggle transfer availability (enable/disable booking)
+router.patch("/:id/availability", toggleTransferAvailability)
 
 // Delete transfer
 router.delete("/:id", deleteTransfer)

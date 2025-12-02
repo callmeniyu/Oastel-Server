@@ -32,6 +32,7 @@ export interface TourType extends Document {
     departureTimes: string[] // e.g. ["08:00 AM","01:30 PM"]
     label?: "Recommended" | "Popular" | "Best Value" | "Best seller"
     details: TourDetails
+    isAvailable: boolean  // Toggle to enable/disable package booking
     lastSlotsGeneratedAt?: Date  // Track when slots were last generated
     createdAt: Date
     updatedAt: Date
@@ -72,6 +73,7 @@ const TourSchema = new Schema<TourType>(
                 },
             ],
         },
+        isAvailable: { type: Boolean, default: true }, // Toggle to enable/disable package booking
         lastSlotsGeneratedAt: { type: Date }, // Track when slots were last generated to date
     },
     { timestamps: true }

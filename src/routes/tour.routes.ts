@@ -8,6 +8,7 @@ import {
     updateTourStatus,
     deleteTour,
     checkSlugAvailability,
+    toggleTourAvailability,
 } from "../controllers/tour.controller"
 
 const router = Router()
@@ -32,6 +33,9 @@ router.put("/:id", updateTour)
 
 // Update tour status (partial update)
 router.patch("/:id", updateTourStatus)
+
+// Toggle tour availability (enable/disable booking)
+router.patch("/:id/availability", toggleTourAvailability)
 
 // Delete tour
 router.delete("/:id", deleteTour)

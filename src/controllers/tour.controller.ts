@@ -446,3 +446,43 @@ export const checkSlugAvailability = async (req: Request, res: Response) => {
         })
     }
 }
+
+// Toggle tour availability (enable/disable booking)
+export const toggleTourAvailability = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params
+        const { isAvailable } = req.body
+
+        if (typeof isAvailable !== 'boolean') {
+            return res.status(400).json({
+                success: false,
+                message: "isAvailable must be a boolean value",
+            })
+        }
+
+        const tour = await Tour.findByIdAndUpdate(
+            id,
+            { isAvailable },
+            { new: true, runValidators: true }
+        )
+
+        if (!tour) {
+            return res.status(404).json({
+                success: false,
+                message: "Tour not found",
+            })
+        }
+
+        res.json({
+            success: true,
+            message: `Tour ${isAvailable ? 'enabled' : 'disabled'} successfully`,
+            data: tour,
+        })
+    } catch (error: any) {
+        console.error("Error toggling tour availability:", error)
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        })
+    }
+}

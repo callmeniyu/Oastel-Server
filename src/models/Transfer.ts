@@ -35,6 +35,7 @@ export interface TransferType extends Document {
     from: string
     to: string
     details: TransferDetails
+    isAvailable: boolean  // Toggle to enable/disable package booking
     lastSlotsGeneratedAt?: Date  // Track when slots were last generated
     createdAt: Date
     updatedAt: Date
@@ -78,6 +79,7 @@ const TransferSchema = new Schema<TransferType>(
                 },
             ],
         },
+        isAvailable: { type: Boolean, default: true }, // Toggle to enable/disable package booking
         lastSlotsGeneratedAt: { type: Date }, // Track when slots were last generated to date
     },
     { timestamps: true }
