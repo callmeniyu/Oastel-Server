@@ -137,7 +137,7 @@ export class CartBookingService {
             userId: user._id,
             packageType: item.packageType,
             packageId: item.packageId,
-            date: new Date(new Date(item.selectedDate).toISOString().split('T')[0] + 'T12:00:00.000Z'),
+            date: TimeSlotService.parseDateAsMalaysiaTimezone(new Date(item.selectedDate).toISOString().split('T')[0]),
             time: item.selectedTime,
             adults: Number(item.adults) || 1, // Ensure it's a number
             children: Number(item.children) || 0, // Ensure it's a number with default
@@ -310,7 +310,7 @@ export class CartBookingService {
               // Ensure we pass a deterministic ISO date string to the email builder
               const rawDate = cartItem?.selectedDate || '';
               const safeIsoDate = rawDate
-                ? new Date(new Date(rawDate).toISOString().split('T')[0] + 'T12:00:00.000Z').toISOString()
+                ? TimeSlotService.parseDateAsMalaysiaTimezone(new Date(rawDate).toISOString().split('T')[0]).toISOString()
                 : '';
 
               // Fetch package details to get pickup guidelines

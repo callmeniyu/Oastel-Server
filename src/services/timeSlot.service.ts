@@ -1,6 +1,7 @@
 import TimeSlot, { TimeSlotType, Slot } from "../models/TimeSlot"
 import Tour from "../models/Tour"
 import Transfer from "../models/Transfer"
+import { parseDateAsMalaysiaTimezone as parseDateUtil } from "../utils/dateUtils"
 import { Types } from "mongoose"
 
 export class TimeSlotService {
@@ -489,6 +490,18 @@ export class TimeSlotService {
         const malaysiaOffset = 8 * 60 * 60 * 1000
         const malaysiaTime = new Date(date.getTime() + malaysiaOffset)
         return malaysiaTime.toISOString().split('T')[0]
+    }
+
+    /**
+     * Parse a YYYY-MM-DD date string as Malaysia timezone date object
+     * This prevents off-by-one day errors when the date is stored and displayed
+     * 
+     * @param dateString - Date string in YYYY-MM-DD format
+     * @returns Date object representing the date at noon in Malaysia timezone (stored as UTC)
+     */
+    static parseDateAsMalaysiaTimezone(dateString: string): Date {
+        // Use the lightweight utility function to avoid code duplication
+        return parseDateUtil(dateString);
     }
 
     /**

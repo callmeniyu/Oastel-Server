@@ -2,6 +2,7 @@ import Cart, { ICart, ICartItem } from '../models/Cart';
 import User from '../models/User';
 import Tour from '../models/Tour';
 import Transfer from '../models/Transfer';
+import { parseDateAsMalaysiaTimezone } from '../utils/dateUtils';
 import mongoose from 'mongoose';
 
 export class CartService {
@@ -79,7 +80,7 @@ export class CartService {
         packageTitle: packageDoc.title,
         packageImage: packageDoc.images?.[0] || packageDoc.image || '',
         packagePrice: packagePrice,
-        selectedDate: new Date(item.selectedDate + 'T12:00:00.000Z'), // Use noon UTC to avoid timezone shifts
+        selectedDate: parseDateAsMalaysiaTimezone(item.selectedDate), // Parse as Malaysia timezone to avoid off-by-one errors
         selectedTime: item.selectedTime,
         adults: item.adults,
         children: item.children,
@@ -95,7 +96,7 @@ export class CartService {
       // Check if item already exists (same package, date, time)
       const existingItemIndex = cart.items.findIndex((cartItem: ICartItem) => 
         cartItem.packageId.toString() === item.packageId &&
-        cartItem.selectedDate.toDateString() === new Date(item.selectedDate + 'T12:00:00.000Z').toDateString() &&
+        cartItem.selectedDate.toDateString() === parseDateAsMalaysiaTimezone(item.selectedDate).toDateString() &&
         cartItem.selectedTime === item.selectedTime
       );
 
@@ -140,13 +141,13 @@ export class CartService {
       // Update fields
       if (updates.adults !== undefined) item.adults = updates.adults;
       if (updates.children !== undefined) item.children = updates.children;
-      if (updates.selectedDate) item.selectedDate = new Date(updates.selectedDate + 'T12:00:00.000Z');
+      if (updates.selectedDate) item.selectedDate = parseDateAsMalaysiaTimezone(updates.selectedDate);
       if (updates.selectedTime) item.selectedTime = updates.selectedTime;
       if (updates.pickupLocation !== undefined) item.pickupLocation = updates.pickupLocation;
 
       // Recalculate total price
       item.totalPrice = (item.adults + item.children) * item.packagePrice;
-
+      
       await cart.save();
       return cart;
     } catch (error) {

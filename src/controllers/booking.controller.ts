@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import BookingService from "../services/booking.service";
 import EmailService from "../services/email.service";
+import { parseDateAsMalaysiaTimezone } from "../utils/dateUtils";
 import mongoose from "mongoose";
 
 class BookingController {
@@ -39,11 +40,10 @@ class BookingController {
       }
 
       // Create booking directly without userId for now
-      // Parse date as local midnight to avoid timezone offset issues (treat incoming YYYY-MM-DD as local date)
-      // Parse incoming YYYY-MM-DD as UTC midday to avoid timezone shift when
-      // converting to ISO date strings later (prevents off-by-one day issues)
+      // Parse date as Malaysia timezone noon to prevent off-by-one day errors
+      // Malaysia is UTC+8, so we use 4 AM UTC which is noon in Malaysia
       const parsedDateForBooking = typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
-        ? new Date(date + 'T12:00:00.000Z')
+        ? parseDateAsMalaysiaTimezone(date)
         : new Date(date);
 
       // Get package details for checking vehicle capacity
@@ -164,9 +164,9 @@ class BookingController {
       // Handle date filtering
       if (req.query.date) {
         const dateStr = req.query.date as string;
-        // Treat incoming date string as local date (YYYY-MM-DD) at midnight
+        // Parse date using Malaysia timezone to match how dates are stored
         const startDate = /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
-          ? new Date(dateStr + 'T00:00:00')
+          ? parseDateAsMalaysiaTimezone(dateStr)
           : new Date(dateStr);
         const endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + 1);
@@ -180,10 +180,28 @@ class BookingController {
       if (req.query.beforeDate) {
         const beforeDateStr = req.query.beforeDate as string;
         const beforeDate = /^\d{4}-\d{2}-\d{2}$/.test(beforeDateStr)
-          ? new Date(beforeDateStr + 'T00:00:00')
+          ? parseDateAsMalaysiaTimezone(beforeDateStr)
           : new Date(beforeDateStr);
         filter.date = {
           $lt: beforeDate,
+        };
+      }
+
+      // Handle date range filtering (for calendar view optimization)
+      if (req.query.startDate && req.query.endDate) {
+        const startDateStr = req.query.startDate as string;
+        const endDateStr = req.query.endDate as string;
+        const startDate = /^\d{4}-\d{2}-\d{2}$/.test(startDateStr)
+          ? parseDateAsMalaysiaTimezone(startDateStr)
+          : new Date(startDateStr);
+        const endDate = /^\d{4}-\d{2}-\d{2}$/.test(endDateStr)
+          ? parseDateAsMalaysiaTimezone(endDateStr)
+          : new Date(endDateStr);
+        // Add one day to endDate to include bookings on that day
+        endDate.setDate(endDate.getDate() + 1);
+        filter.date = {
+          $gte: startDate,
+          $lt: endDate,
         };
       }
 

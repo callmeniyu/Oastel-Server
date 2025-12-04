@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { cartService } from '../services/cart.service';
+import { parseDateAsMalaysiaTimezone } from '../utils/dateUtils';
 
 export class CartController {
   // Get cart for user
@@ -88,7 +89,7 @@ export class CartController {
 
       // Check if selected date is not in the past (only when provided)
       if (selectedDate) {
-        const selectedDateObj = new Date(selectedDate + 'T12:00:00.000Z'); // Use noon UTC to avoid timezone issues
+        const selectedDateObj = parseDateAsMalaysiaTimezone(selectedDate); // Parse as Malaysia timezone to avoid off-by-one errors
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         if (selectedDateObj < today) {
@@ -166,7 +167,7 @@ export class CartController {
       }
 
       if (updates.selectedDate) {
-        const selectedDateObj = new Date(updates.selectedDate + 'T12:00:00.000Z');
+        const selectedDateObj = parseDateAsMalaysiaTimezone(updates.selectedDate);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         

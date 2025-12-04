@@ -6,7 +6,8 @@ import mongoose from "mongoose";
 
 class BookingService {
   // Mark confirmed bookings as completed if their date/time is in the past
-  private async markPastBookingsCompleted(additionalFilter: any = {}) {
+  // NOTE: This should be called by a scheduled cron job, not on every page load
+  async markPastBookingsCompleted(additionalFilter: any = {}) {
     try {
       const now = new Date();
       // Find bookings that are confirmed and whose date is before today (end of that day)
@@ -358,8 +359,9 @@ class BookingService {
     // Copy all filter properties to query
     Object.assign(query, filter);
 
-  // Ensure past confirmed bookings are updated to completed before returning lists
-  await this.markPastBookingsCompleted(filter);
+    // NOTE: Removed automatic markPastBookingsCompleted() call from here
+    // It was causing severe performance issues by running on every page load
+    // This should be handled by a scheduled cron job instead
 
     // Populate packageId based on packageType
     const bookings = await BookingModel.find(query)
@@ -388,8 +390,9 @@ class BookingService {
     // Copy all filter properties to query
     Object.assign(query, filter);
 
-  // Ensure past confirmed bookings are updated to completed before returning lists
-  await this.markPastBookingsCompleted(filter);
+    // NOTE: Removed automatic markPastBookingsCompleted() call from here
+    // It was causing severe performance issues by running on every page load
+    // This should be handled by a scheduled cron job instead
 
     // Get bookings first
     const bookings = await BookingModel.find(query)
