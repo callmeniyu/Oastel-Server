@@ -2,6 +2,7 @@
 const Stripe = require('stripe');
 import { Request, Response } from 'express';
 import { EmailService } from '../services/email.service';
+import { parseDateAsMalaysiaTimezone } from '../utils/dateUtils';
 // TimeSlotService used to update timeslot bookedCount; import once to avoid redeclaration
 const { TimeSlotService } = require('../services/timeSlot.service');
 
@@ -477,8 +478,14 @@ export class PaymentController {
           };
         } else {
           // No existing booking found, create new one
+          // CRITICAL: Parse date as Malaysia timezone to avoid off-by-one day errors
+          const parsedDate = typeof bookingData.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(bookingData.date)
+            ? parseDateAsMalaysiaTimezone(bookingData.date)
+            : new Date(bookingData.date);
+          
           const finalBookingData = {
             ...bookingData,
+            date: parsedDate, // Use parsed date instead of raw date string
             paymentInfo: {
               paymentIntentId: paymentIntent.id,
               amount: paymentIntent.amount / 100,
