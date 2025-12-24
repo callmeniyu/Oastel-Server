@@ -274,12 +274,18 @@ export class PaymentController {
           };
 
           const cartResult = await cartBookingService.bookCartItems(cartBookingRequest);
+          
+          // Fetch the actual booking documents for email sending
+          const createdBookings = cartResult.bookings.length > 0 
+            ? await Booking.find({ _id: { $in: cartResult.bookings } })
+            : [];
+          
           bookingResult = {
             success: cartResult.success,
             bookingIds: cartResult.bookings,
             totalBookings: cartResult.bookings.length,
             error: cartResult.errors.length > 0 ? cartResult.errors.join(', ') : null,
-            data: cartResult
+            data: createdBookings
           };
         } else {
           // Update existing bookings payment status AND update slot counts
