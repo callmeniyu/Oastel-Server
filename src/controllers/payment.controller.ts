@@ -290,7 +290,8 @@ export class PaymentController {
                 'paymentInfo.paymentStatus': 'succeeded',
                 'paymentInfo.paymentMethod': 'stripe',
                 'paymentInfo.stripePaymentIntentId': paymentIntent.id,
-                'paymentInfo.paymentIntentId': paymentIntent.id
+                'paymentInfo.paymentIntentId': paymentIntent.id,
+                'status': 'confirmed'
               }
             }
           );
@@ -435,6 +436,8 @@ export class PaymentController {
           // Update existing booking payment status AND update slot counts
           existingBooking.paymentInfo.paymentStatus = 'succeeded';
           existingBooking.paymentInfo.paymentMethod = 'stripe';
+          existingBooking.paymentInfo.stripePaymentIntentId = paymentIntent.id;
+          existingBooking.status = 'confirmed';
           const savedBooking = await existingBooking.save();
 
           console.log('[PAYMENT] Updated existing booking:', savedBooking._id);
@@ -486,8 +489,10 @@ export class PaymentController {
           const finalBookingData = {
             ...bookingData,
             date: parsedDate, // Use parsed date instead of raw date string
+            status: 'confirmed',
             paymentInfo: {
               paymentIntentId: paymentIntent.id,
+              stripePaymentIntentId: paymentIntent.id,
               amount: paymentIntent.amount / 100,
               currency: paymentIntent.currency,
               paymentStatus: 'succeeded',

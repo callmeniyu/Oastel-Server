@@ -2,11 +2,15 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface PaymentInfo {
   paymentIntentId?: string;
+  stripePaymentIntentId?: string;
+  stripeSessionId?: string;
   paymentStatus: 'pending' | 'processing' | 'succeeded' | 'failed';
   amount: number;
   bankCharge: number;
   currency: string;
   paymentMethod?: string;
+  failedReason?: string;
+  updatedAt?: Date;
   refundStatus?: 'none' | 'partial' | 'full';
   refundAmount?: number;
 }
@@ -66,6 +70,8 @@ const BookingSchema: Schema = new Schema(
     },
     paymentInfo: {
       paymentIntentId: String,
+      stripePaymentIntentId: String,
+      stripeSessionId: String,
       paymentStatus: {
         type: String,
         enum: ['pending', 'processing', 'succeeded', 'failed'],
@@ -75,6 +81,8 @@ const BookingSchema: Schema = new Schema(
       bankCharge: { type: Number, required: true },
       currency: { type: String, default: 'MYR' },
       paymentMethod: String,
+      failedReason: String,
+      updatedAt: Date,
       refundStatus: {
         type: String,
         enum: ['none', 'partial', 'full'],
@@ -101,6 +109,8 @@ BookingSchema.index({ packageId: 1, date: 1 });
 BookingSchema.index({ slotId: 1 });
 BookingSchema.index({ status: 1, date: 1 });
 BookingSchema.index({ 'paymentInfo.paymentStatus': 1 });
+BookingSchema.index({ 'paymentInfo.stripePaymentIntentId': 1 });
+BookingSchema.index({ 'paymentInfo.stripeSessionId': 1 });
 BookingSchema.index({ createdAt: -1 });
 BookingSchema.index({ reviewEmailSent: 1, date: 1 }); // For review email scheduler
 
