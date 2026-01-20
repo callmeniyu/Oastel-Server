@@ -22,6 +22,8 @@ export interface TourType extends Document {
     period: "Half-Day" | "Full-Day"
     status: "active" | "sold"
     bookedCount: number
+    reviewCount: number
+    rating: number
     oldPrice: number
     newPrice: number
     childPrice: number
@@ -51,6 +53,8 @@ const TourSchema = new Schema<TourType>(
         period: { type: String, enum: ["Half-Day", "Full-Day"], required: true },
         status: { type: String, enum: ["active", "sold"], default: "active" },
         bookedCount: { type: Number, default: 0 },
+        reviewCount: { type: Number, default: 0 },
+        rating: { type: Number, default: 5 },
         oldPrice: Number,
         newPrice: Number,
         childPrice: Number,

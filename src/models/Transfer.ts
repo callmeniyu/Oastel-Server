@@ -24,6 +24,8 @@ export interface TransferType extends Document {
     duration: string
     status: "active" | "sold"
     bookedCount: number
+    reviewCount: number
+    rating: number
     oldPrice: number
     newPrice: number
     childPrice: number
@@ -54,12 +56,14 @@ const TransferSchema = new Schema<TransferType>(
         duration: String,
         status: { type: String, enum: ["active", "sold"], default: "active" },
         bookedCount: { type: Number, default: 0 },
+        reviewCount: { type: Number, default: 0 },
+        rating: { type: Number, default: 5 },
         oldPrice: Number,
         newPrice: Number,
         childPrice: Number,
         minimumPerson: Number,
         maximumPerson: Number,
-    seatCapacity: Number,
+        seatCapacity: Number,
         times: [String],
         label: { type: String, enum: ["Recommended", "Popular", "Best Value", "Best seller"], default: null },
         from: String,
