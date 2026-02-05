@@ -300,7 +300,7 @@ export class BrevoEmailService {
               <li><strong>✓ HTML Content:</strong> Rendering properly</li>
               <li><strong>✓ Sender Configuration:</strong> ${emailConfig.from.name} &lt;${emailConfig.from.email}&gt;</li>
             </ul>
-            <p><strong>Sent at:</strong> ${new Date().toLocaleString()}</p>
+            <p><strong>Sent at:</strong> ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })}</p>
             <p style="margin-top: 20px; padding: 15px; background: #e8f8f5; border-left: 4px solid #0C7157; border-radius: 4px;">
               <strong>✅ Your booking confirmation emails will now be delivered successfully!</strong><br>
               The SMTP port blocking issue has been resolved using Brevo's HTTP API.
@@ -365,7 +365,7 @@ export class BrevoEmailService {
           <h3>Message</h3>
           <p style="white-space: pre-wrap;">${message}</p>
           <hr />
-          <p>Sent on: ${new Date().toLocaleString()}</p>
+          <p>Sent on: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })}</p>
         </div>
       </body>
       </html>
@@ -914,11 +914,13 @@ export class BrevoEmailService {
         if (!dateString) return "Invalid Date";
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return "Invalid Date";
+        // Format date using Malaysia timezone to ensure correct date display
         return date.toLocaleDateString('en-US', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
           day: 'numeric',
+          timeZone: 'Asia/Kuala_Lumpur', // Use Malaysia timezone for correct date display
         });
       } catch {
         return "Invalid Date";
@@ -1060,7 +1062,7 @@ export class BrevoEmailService {
                 </div>
                 
                 <div style="background: #e8f8f5; padding: 15px; border-radius: 6px; margin: 20px 0;">
-                    <p><strong>⏰ Booking Time:</strong> ${new Date().toLocaleString()}</p>
+                    <p><strong>⏰ Booking Time:</strong> ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })}</p>
                     <p><strong>📧 Confirmation Email:</strong> Sent to customer at ${booking.customerEmail}</p>
                 </div>
                 
@@ -1083,10 +1085,12 @@ export class BrevoEmailService {
         if (!dateString) return "Invalid Date";
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return "Invalid Date";
+        // Format date using Malaysia timezone to ensure correct date display
         return date.toLocaleDateString('en-US', {
           weekday: 'short',
           month: 'short',
           day: 'numeric',
+          timeZone: 'Asia/Kuala_Lumpur', // Use Malaysia timezone for correct date display
         });
       } catch {
         return "Invalid Date";
@@ -1181,7 +1185,7 @@ export class BrevoEmailService {
                     <h3 style="color: #dc2626; margin-bottom: 15px;">Customer Information</h3>
                     <p><strong>Name:</strong> ${cartData.customerName}</p>
                     <p><strong>Email:</strong> ${cartData.customerEmail}</p>
-                    <p><strong>Booking Time:</strong> ${new Date().toLocaleString()}</p>
+                    <p><strong>Booking Time:</strong> ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' })}</p>
                 </div>
                 
                 <h3 style="color: #dc2626; margin: 25px 0 15px 0;">All Bookings (${cartData.bookings.length} items):</h3>

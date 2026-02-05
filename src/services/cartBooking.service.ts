@@ -133,11 +133,15 @@ export class CartBookingService {
           console.log(`   - Pickup Location: "${item.pickupLocation || ''}"`);
           console.log(`   - Total Price: ${item.totalPrice}`);
 
+          // Extract date string safely without timezone conversion issues
+          // selectedDate is always a Date object from Cart model
+          const dateString = item.selectedDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
+
           const bookingData = {
             userId: user._id,
             packageType: item.packageType,
             packageId: item.packageId,
-            date: TimeSlotService.parseDateAsMalaysiaTimezone(new Date(item.selectedDate).toISOString().split('T')[0]),
+            date: TimeSlotService.parseDateAsMalaysiaTimezone(dateString),
             time: item.selectedTime,
             adults: Number(item.adults) || 1, // Ensure it's a number
             children: Number(item.children) || 0, // Ensure it's a number with default
@@ -194,10 +198,15 @@ export class CartBookingService {
               if (isPrivate) {
                 // Use 1 as the increment for vehicle booking and pass seatCapacity as personsCount for internal checks
                 const seatCap = pkg.seatCapacity || pkg.maximumPerson || 1;
+                // Extract date string safely without timezone conversion
+                const dateStr = typeof item.selectedDate === 'string' 
+                  ? item.selectedDate 
+                  : item.selectedDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
+                
                 await TimeSlotService.updateSlotBooking(
                   item.packageType,
                   item.packageId,
-                  TimeSlotService.formatDateToMalaysiaTimezone(new Date(item.selectedDate).toISOString().split('T')[0]),
+                  TimeSlotService.formatDateToMalaysiaTimezone(dateStr),
                   item.selectedTime,
                   1, // one vehicle
                   "add"
@@ -212,10 +221,15 @@ export class CartBookingService {
                 );
                 console.log(`✅ Updated Transfer bookedCount by 1 for package ${item.packageId}`);
               } else {
+                // Extract date string safely without timezone conversion
+                const dateStr = typeof item.selectedDate === 'string' 
+                  ? item.selectedDate 
+                  : item.selectedDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
+                
                 await TimeSlotService.updateSlotBooking(
                   item.packageType,
                   item.packageId,
-                  TimeSlotService.formatDateToMalaysiaTimezone(new Date(item.selectedDate).toISOString().split('T')[0]),
+                  TimeSlotService.formatDateToMalaysiaTimezone(dateStr),
                   item.selectedTime,
                   totalGuests,
                   "add"
@@ -232,10 +246,15 @@ export class CartBookingService {
               }
             } else {
               // Tours: update by total guests
+              // Extract date string safely without timezone conversion
+              const dateStr = typeof item.selectedDate === 'string' 
+                ? item.selectedDate 
+                : item.selectedDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
+              
               await TimeSlotService.updateSlotBooking(
                 item.packageType,
                 item.packageId,
-                TimeSlotService.formatDateToMalaysiaTimezone(new Date(item.selectedDate).toISOString().split('T')[0]),
+                TimeSlotService.formatDateToMalaysiaTimezone(dateStr),
                 item.selectedTime,
                 totalGuests,
                 "add"
@@ -309,8 +328,12 @@ export class CartBookingService {
               const total = Number(itemPrice + bankCharge);
               // Ensure we pass a deterministic ISO date string to the email builder
               const rawDate = cartItem?.selectedDate || '';
-              const safeIsoDate = rawDate
-                ? TimeSlotService.parseDateAsMalaysiaTimezone(new Date(rawDate).toISOString().split('T')[0]).toISOString()
+              // Extract date string safely without timezone conversion
+              const dateStr = typeof rawDate === 'string' 
+                ? rawDate 
+                : rawDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
+              const safeIsoDate = dateStr
+                ? TimeSlotService.parseDateAsMalaysiaTimezone(dateStr).toISOString()
                 : '';
 
               // Fetch package details to get pickup guidelines

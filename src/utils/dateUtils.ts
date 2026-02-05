@@ -27,8 +27,12 @@ export function getMalaysianNow(): Date {
  * 
  * CRITICAL: This ensures dates are interpreted consistently regardless of server timezone
  * 
+ * APPROACH: For date "2026-02-06", we want to store it as a Date object that when displayed
+ * in Malaysia timezone (UTC+8), shows "2026-02-06 00:00:00". 
+ * This means the UTC value should be "2026-02-05 16:00:00" (8 hours earlier).
+ * 
  * @param dateString - Date string in YYYY-MM-DD format
- * @returns Date object representing the date in Malaysia timezone
+ * @returns Date object representing midnight on that date in Malaysia timezone (stored as UTC)
  */
 export function parseDateAsMalaysiaTimezone(dateString: string): Date {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
@@ -37,21 +41,16 @@ export function parseDateAsMalaysiaTimezone(dateString: string): Date {
   
   const [year, month, day] = dateString.split('-').map(Number);
   
-  // Create a date string that will be interpreted correctly
-  // We need to ensure this date, when viewed in Malaysian timezone, shows the correct date
-  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00`;
+  // Malaysia is UTC+8
+  // To represent "2026-02-06 00:00:00 Malaysia time" in UTC, we need "2026-02-05 16:00:00 UTC"
+  // Create the date in UTC by manually calculating: subtract 8 hours from midnight
+  const utcDate = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
   
-  // Parse as if it's in Malaysian timezone
-  // This approach uses the local string parsing but ensures consistency
-  const date = new Date(dateStr);
+  // Subtract 8 hours (Malaysia offset) to get the correct UTC representation
+  const malaysiaOffsetMs = 8 * 60 * 60 * 1000;
+  const correctedUtc = utcDate - malaysiaOffsetMs;
   
-  // Get what this date looks like in Malaysian timezone
-  const malaysianDateStr = new Date(date.toLocaleString('en-US', { timeZone: MALAYSIA_TIMEZONE }));
-  
-  // Calculate the offset needed to make this date correct in Malaysian timezone
-  const offset = date.getTime() - malaysianDateStr.getTime();
-  
-  return new Date(date.getTime() + offset);
+  return new Date(correctedUtc);
 }
 
 /**

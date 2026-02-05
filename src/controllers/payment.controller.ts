@@ -74,6 +74,46 @@ export class PaymentController {
         });
       }
 
+      // Generate idempotency key based on booking details to prevent duplicate payment intents
+      const idempotencyKey = `booking_${bookingData.packageId}_${bookingData.date}_${bookingData.time}_${bookingData.contactInfo?.email}_${amount}`;
+      console.log('[PAYMENT] Using idempotency key:', idempotencyKey);
+
+      // Check if a payment intent already exists for this booking within the last 5 minutes
+      const fiveMinutesAgo = Math.floor(Date.now() / 1000) - 300;
+      const existingIntents = await stripe.paymentIntents.list({
+        limit: 10,
+        created: { gte: fiveMinutesAgo },
+      });
+
+      const duplicateIntent = existingIntents.data.find((intent: any) => 
+        intent.metadata.packageId === bookingData.packageId &&
+        intent.metadata.date === bookingData.date &&
+        intent.metadata.time === bookingData.time &&
+        intent.metadata.customerEmail === bookingData.contactInfo?.email &&
+        intent.amount === Math.round(amount * 100) &&
+        (intent.status === 'requires_payment_method' || 
+         intent.status === 'requires_confirmation' || 
+         intent.status === 'requires_action' ||
+         intent.status === 'processing' ||
+         intent.status === 'succeeded')
+      );
+
+      if (duplicateIntent) {
+        console.log('[PAYMENT] Found existing payment intent:', duplicateIntent.id, 'with status:', duplicateIntent.status);
+        
+        // Return existing payment intent instead of creating a duplicate
+        return res.json({
+          success: true,
+          data: {
+            clientSecret: duplicateIntent.client_secret,
+            paymentIntentId: duplicateIntent.id,
+            amount: duplicateIntent.amount,
+            currency: duplicateIntent.currency
+          },
+          message: 'Returning existing payment intent to prevent duplicate charge'
+        });
+      }
+
       // Convert amount to cents (Stripe uses smallest currency unit)
       const amountInCents = Math.round(amount * 100);
 
@@ -98,9 +138,13 @@ export class PaymentController {
           children: bookingData.children?.toString() || '0',
           customerEmail: bookingData.contactInfo?.email || '',
           customerName: bookingData.contactInfo?.name || '',
+          idempotencyKey, // Add idempotency key to metadata for tracking
           ...metadata
         },
         description: `Booking for ${bookingData.packageType} - ${bookingData.contactInfo?.name || 'Guest'}`,
+      },
+      {
+        idempotencyKey, // Stripe's built-in idempotency protection
       });
 
       console.log('[PAYMENT] Payment intent created successfully:', paymentIntent.id);
@@ -162,6 +206,47 @@ export class PaymentController {
         });
       }
 
+      // Generate idempotency key for cart bookings
+      const cartItemsHash = cartData.items
+        .map((item: any) => `${item.packageId}_${item.date}_${item.time}`)
+        .sort()
+        .join('|');
+      const idempotencyKey = `cart_${contactInfo.email}_${cartItemsHash}_${amount}`;
+      console.log('[PAYMENT] Using cart idempotency key:', idempotencyKey.substring(0, 50) + '...');
+
+      // Check for recent duplicate cart payment intents
+      const fiveMinutesAgo = Math.floor(Date.now() / 1000) - 300;
+      const existingIntents = await stripe.paymentIntents.list({
+        limit: 10,
+        created: { gte: fiveMinutesAgo },
+      });
+
+      const duplicateIntent = existingIntents.data.find((intent: any) => 
+        intent.metadata.bookingType === 'cart' &&
+        intent.metadata.customerEmail === contactInfo.email &&
+        intent.amount === Math.round(amount * 100) &&
+        (intent.status === 'requires_payment_method' || 
+         intent.status === 'requires_confirmation' || 
+         intent.status === 'requires_action' ||
+         intent.status === 'processing' ||
+         intent.status === 'succeeded')
+      );
+
+      if (duplicateIntent) {
+        console.log('[PAYMENT] Found existing cart payment intent:', duplicateIntent.id, 'with status:', duplicateIntent.status);
+        
+        return res.json({
+          success: true,
+          data: {
+            clientSecret: duplicateIntent.client_secret,
+            paymentIntentId: duplicateIntent.id,
+            amount: duplicateIntent.amount,
+            currency: duplicateIntent.currency
+          },
+          message: 'Returning existing cart payment intent to prevent duplicate charge'
+        });
+      }
+
       // Convert amount to cents
       const amountInCents = Math.round(amount * 100);
 
@@ -180,9 +265,13 @@ export class PaymentController {
           customerEmail: contactInfo.email || '',
           customerName: contactInfo.name || '',
           userEmail: cartData.userEmail || '',
+          idempotencyKey, // Add to metadata for tracking
           ...metadata
         },
         description: `Cart booking (${cartData.items.length} items) - ${contactInfo.name || 'Guest'}`,
+      },
+      {
+        idempotencyKey, // Stripe's built-in idempotency protection
       });
 
       console.log('[PAYMENT] Cart payment intent created successfully:', paymentIntent.id);
@@ -311,14 +400,14 @@ export class PaymentController {
               const totalGuests = (booking.adults || 0) + (booking.children || 0);
               
               // Convert booking date to YYYY-MM-DD Malaysia timezone for timeslot lookup
-              let dateStr = booking.date;
-              if (booking.date instanceof Date) {
-                dateStr = booking.date.toISOString().split('T')[0];
+              let dateStr: string;
+              if (booking.date instanceof Date) {                // Import formatDateAsMalaysiaTimezone at the top of this file
+                const { formatDateAsMalaysiaTimezone } = require('../utils/dateUtils');
+                dateStr = formatDateAsMalaysiaTimezone(booking.date);
               } else if (typeof booking.date === 'string' && booking.date.includes('T')) {
                 dateStr = booking.date.split('T')[0];
-              } else if (typeof booking.date === 'string') {
-                const bookingDate = new Date(booking.date);
-                dateStr = bookingDate.toISOString().split('T')[0];
+              } else {
+                dateStr = String(booking.date);
               }
               // Normalize to Malaysia timezone format using service util
               dateStr = TimeSlotService.formatDateToMalaysiaTimezone(dateStr);
@@ -433,6 +522,61 @@ export class PaymentController {
         // Handle single booking - find existing booking by payment intent ID
         console.log('[PAYMENT] Single booking - finding existing booking...');
         
+        // First check if this payment intent already has a confirmed booking
+        const alreadyConfirmedBooking = await Booking.findOne({
+          $or: [
+            { 'paymentInfo.stripePaymentIntentId': paymentIntent.id },
+            { 'paymentInfo.paymentIntentId': paymentIntent.id }
+          ],
+          'paymentInfo.paymentStatus': 'succeeded'
+        });
+
+        if (alreadyConfirmedBooking) {
+          console.log('[PAYMENT] ⚠️ Payment intent already has a confirmed booking:', alreadyConfirmedBooking._id);
+          // Return success to prevent retry, but with existing booking
+          return res.json({
+            success: true,
+            message: 'Payment already confirmed for this booking',
+            data: {
+              paymentIntentId: paymentIntent.id,
+              paymentStatus: paymentIntent.status,
+              bookingIds: [alreadyConfirmedBooking._id],
+              totalBookings: 1,
+              isDuplicate: true
+            }
+          });
+        }
+
+        // Check for duplicate bookings with same customer details within last 5 minutes
+        if (paymentIntent.metadata.customerEmail && paymentIntent.metadata.date && paymentIntent.metadata.time) {
+          const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+          const potentialDuplicates = await Booking.find({
+            'contactInfo.email': paymentIntent.metadata.customerEmail,
+            'packageId': paymentIntent.metadata.packageId,
+            'date': paymentIntent.metadata.date,
+            'time': paymentIntent.metadata.time,
+            'adults': parseInt(paymentIntent.metadata.adults || '0'),
+            'paymentInfo.paymentStatus': 'succeeded',
+            'createdAt': { $gte: fiveMinutesAgo }
+          });
+
+          if (potentialDuplicates.length > 0) {
+            console.log('[PAYMENT] ⚠️ Found potential duplicate booking(s):', potentialDuplicates.map((b: any) => b._id));
+            // Return the existing booking instead of creating duplicate
+            return res.json({
+              success: true,
+              message: 'Duplicate booking prevented - returning existing booking',
+              data: {
+                paymentIntentId: paymentIntent.id,
+                paymentStatus: paymentIntent.status,
+                bookingIds: [potentialDuplicates[0]._id],
+                totalBookings: 1,
+                isDuplicate: true
+              }
+            });
+          }
+        }
+        
         const existingBooking = await Booking.findOne({
           'paymentInfo.paymentIntentId': paymentIntent.id,
           'paymentInfo.paymentStatus': 'pending'
@@ -454,14 +598,14 @@ export class PaymentController {
             const totalGuests = (existingBooking.adults || 0) + (existingBooking.children || 0);
             
             // Convert booking date to YYYY-MM-DD Malaysia timezone for timeslot lookup
-            let dateStr = existingBooking.date;
+            let dateStr: string;
             if (existingBooking.date instanceof Date) {
-              dateStr = existingBooking.date.toISOString().split('T')[0];
+              const { formatDateAsMalaysiaTimezone } = require('../utils/dateUtils');
+              dateStr = formatDateAsMalaysiaTimezone(existingBooking.date);
             } else if (typeof existingBooking.date === 'string' && existingBooking.date.includes('T')) {
               dateStr = existingBooking.date.split('T')[0];
-            } else if (typeof existingBooking.date === 'string') {
-              const bookingDate = new Date(existingBooking.date);
-              dateStr = bookingDate.toISOString().split('T')[0];
+            } else {
+              dateStr = String(existingBooking.date);
             }
             dateStr = TimeSlotService.formatDateToMalaysiaTimezone(dateStr);
             
@@ -516,14 +660,14 @@ export class PaymentController {
             const totalGuests = (bookingData.adults || 0) + (bookingData.children || 0);
             
             // Convert booking date to YYYY-MM-DD Malaysia timezone for timeslot lookup
-            let dateStr = bookingData.date;
+            let dateStr: string;
             if (bookingData.date instanceof Date) {
-              dateStr = bookingData.date.toISOString().split('T')[0];
+              const { formatDateAsMalaysiaTimezone } = require('../utils/dateUtils');
+              dateStr = formatDateAsMalaysiaTimezone(bookingData.date);
             } else if (typeof bookingData.date === 'string' && bookingData.date.includes('T')) {
               dateStr = bookingData.date.split('T')[0];
-            } else if (typeof bookingData.date === 'string') {
-              const bookingDate = new Date(bookingData.date);
-              dateStr = bookingDate.toISOString().split('T')[0];
+            } else {
+              dateStr = String(bookingData.date);
             }
             dateStr = TimeSlotService.formatDateToMalaysiaTimezone(dateStr);
             

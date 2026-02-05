@@ -269,11 +269,13 @@ export class EmailService {
         if (!dateString) return "Invalid Date";
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return "Invalid Date";
+        // Format date using Malaysia timezone to ensure correct date display
         return date.toLocaleDateString('en-US', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
           day: 'numeric',
+          timeZone: 'Asia/Kuala_Lumpur', // Use Malaysia timezone for correct date display
         });
       } catch {
         return "Invalid Date";
@@ -927,11 +929,13 @@ export class EmailService {
         if (!dateString) return "Invalid Date";
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return "Invalid Date";
+        // Format date using Malaysia timezone to ensure correct date display
         return date.toLocaleDateString('en-US', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
           day: 'numeric',
+          timeZone: 'Asia/Kuala_Lumpur', // Use Malaysia timezone for correct date display
         });
       } catch {
         return "Invalid Date";
@@ -1223,11 +1227,13 @@ export class EmailService {
         if (!dateString) return "Invalid Date";
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return "Invalid Date";
+        // Format date using Malaysia timezone to ensure correct date display
         return date.toLocaleDateString('en-US', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
           day: 'numeric',
+          timeZone: 'Asia/Kuala_Lumpur', // Use Malaysia timezone for correct date display
         });
       } catch {
         return "Invalid Date";
@@ -1539,11 +1545,13 @@ export class EmailService {
         if (!dateString) return "Invalid Date";
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return "Invalid Date";
+        // Format date using Malaysia timezone to ensure correct date display
         return date.toLocaleDateString('en-US', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
           day: 'numeric',
+          timeZone: 'Asia/Kuala_Lumpur', // Use Malaysia timezone for correct date display
         });
       } catch {
         return "Invalid Date";
@@ -1702,10 +1710,12 @@ export class EmailService {
         if (!dateString) return "Invalid Date";
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return "Invalid Date";
+        // Format date using Malaysia timezone to ensure correct date display
         return date.toLocaleDateString('en-US', {
           weekday: 'short',
           month: 'short',
           day: 'numeric',
+          timeZone: 'Asia/Kuala_Lumpur', // Use Malaysia timezone for correct date display
         });
       } catch {
         return "Invalid Date";

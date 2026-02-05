@@ -104,9 +104,8 @@ class BookingService {
       // For vehicle bookings, requestedPersons should be treated as 1 (one vehicle)
       const requestedPersons = data.isVehicleBooking ? 1 : totalGuests;
       // Ensure we use Malaysia-local date string for slot lookups (avoid UTC shift)
-      const slotDateStr = TimeSlotService.formatDateToMalaysiaTimezone(
-        data.date.toISOString().split('T')[0]
-      );
+      const { formatDateAsMalaysiaTimezone } = require('../utils/dateUtils');
+      const slotDateStr = formatDateAsMalaysiaTimezone(data.date);
 
       const availability = await TimeSlotService.checkAvailability(
         data.packageType,
@@ -244,7 +243,10 @@ class BookingService {
             packageType: booking.packageType,
             from: booking.from,
             to: booking.to,
-            date: booking.date.toISOString().split('T')[0], // Format date as YYYY-MM-DD
+            date: (() => {
+              const { formatDateAsMalaysiaTimezone } = require('../utils/dateUtils');
+              return formatDateAsMalaysiaTimezone(booking.date);
+            })(), // Format date as YYYY-MM-DD in Malaysia timezone
             time: booking.time,
             adults: booking.adults,
             children: booking.children,
@@ -536,9 +538,8 @@ class BookingService {
       const persons = booking.isVehicleBooking ? 1 : (booking.adults + booking.children);
 
       // Format date string for TimeSlotService
-      const slotDateStr = TimeSlotService.formatDateToMalaysiaTimezone(
-        booking.date.toISOString().split('T')[0]
-      );
+      const { formatDateAsMalaysiaTimezone } = require('../utils/dateUtils');
+      const slotDateStr = formatDateAsMalaysiaTimezone(booking.date);
 
       // Subtract booked count from time slot
       try {
