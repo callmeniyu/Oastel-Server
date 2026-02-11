@@ -326,15 +326,15 @@ export class CartBookingService {
               const itemPrice = Number(cartItem?.totalPrice) || 0;
               const bankCharge = Number(itemPrice * 0.028) || 0;
               const total = Number(itemPrice + bankCharge);
-              // Ensure we pass a deterministic ISO date string to the email builder
+              // Pass YYYY-MM-DD date format to email builder (not ISO string)
+              // This ensures consistent date parsing across all email templates
               const rawDate = cartItem?.selectedDate || '';
               // Extract date string safely without timezone conversion
               const dateStr = typeof rawDate === 'string' 
                 ? rawDate 
                 : rawDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
-              const safeIsoDate = dateStr
-                ? TimeSlotService.parseDateAsMalaysiaTimezone(dateStr).toISOString()
-                : '';
+              // Keep it as YYYY-MM-DD format for email (don't convert to ISO)
+              const safeDateStr = dateStr || '';
 
               // Fetch package details to get pickup guidelines
               let packageDetails: any = null;
@@ -355,7 +355,7 @@ export class CartBookingService {
                 packageType: cartItem?.packageType || 'tour',
                 from: cartItem?.pickupLocation || '',
                 to: cartItem?.pickupLocation || '',
-                date: safeIsoDate,
+                date: safeDateStr,
                 time: cartItem?.selectedTime || '',
                 adults: cartItem?.adults || 1,
                 children: cartItem?.children || 0,

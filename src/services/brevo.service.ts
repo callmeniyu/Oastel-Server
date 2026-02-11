@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 import { emailConfig } from '../config/email.config';
 import { BookingEmailData, CartBookingEmailData, ReviewEmailData } from './email.service';
+import { parseFlexibleDate } from '../utils/dateUtils';
 
 export class BrevoEmailService {
   private static readonly API_URL = 'https://api.brevo.com/v3/smtp/email';
@@ -412,17 +413,18 @@ export class BrevoEmailService {
   private static generateBookingConfirmationHTML(booking: BookingEmailData): string {
     const formatDate = (dateString: string) => {
       try {
-        if (!dateString) return "Invalid Date";
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return "Invalid Date";
-        return date.toLocaleDateString('en-US', {
+        if (!dateString) return 'Invalid Date';
+        const parsed = parseFlexibleDate(dateString);
+        if (!parsed) return 'Invalid Date';
+        return parsed.toLocaleDateString('en-US', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
           day: 'numeric',
+          timeZone: 'Asia/Kuala_Lumpur',
         });
       } catch {
-        return "Invalid Date";
+        return 'Invalid Date';
       }
     };
 
@@ -1082,18 +1084,17 @@ export class BrevoEmailService {
   private static generateCartBookingNotificationHTML(cartData: CartBookingEmailData): string {
     const formatDate = (dateString: string) => {
       try {
-        if (!dateString) return "Invalid Date";
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return "Invalid Date";
-        // Format date using Malaysia timezone to ensure correct date display
-        return date.toLocaleDateString('en-US', {
+        if (!dateString) return 'Invalid Date';
+        const parsed = parseFlexibleDate(dateString);
+        if (!parsed) return 'Invalid Date';
+        return parsed.toLocaleDateString('en-US', {
           weekday: 'short',
           month: 'short',
           day: 'numeric',
-          timeZone: 'Asia/Kuala_Lumpur', // Use Malaysia timezone for correct date display
+          timeZone: 'Asia/Kuala_Lumpur',
         });
       } catch {
-        return "Invalid Date";
+        return 'Invalid Date';
       }
     };
 

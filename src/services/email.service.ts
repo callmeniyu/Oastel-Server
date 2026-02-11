@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import { emailConfig } from '../config/email.config';
 import { Types } from 'mongoose';
 import { BrevoEmailService } from './brevo.service';
+import { parseFlexibleDate } from '../utils/dateUtils';
 
 export interface BookingEmailData {
   customerName: string;
@@ -264,23 +265,22 @@ export class EmailService {
    * Generate modern HTML email template for booking confirmation
    */
   private generateBookingConfirmationHTML(booking: BookingEmailData): string {
-    const formatDate = (dateString: string) => {
-      try {
-        if (!dateString) return "Invalid Date";
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return "Invalid Date";
-        // Format date using Malaysia timezone to ensure correct date display
-        return date.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          timeZone: 'Asia/Kuala_Lumpur', // Use Malaysia timezone for correct date display
-        });
-      } catch {
-        return "Invalid Date";
-      }
-    };
+        const formatDate = (dateString: string) => {
+            try {
+                if (!dateString) return 'Invalid Date';
+                const parsed = parseFlexibleDate(dateString);
+                if (!parsed) return 'Invalid Date';
+                return parsed.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    timeZone: 'Asia/Kuala_Lumpur',
+                });
+            } catch {
+                return 'Invalid Date';
+            }
+        };
 
     const formatTime = (timeString: string) => {
       try {

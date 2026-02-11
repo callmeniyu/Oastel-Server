@@ -436,6 +436,10 @@ export class PaymentController {
           };
         }
 
+        // ⚠️ NOTE: Cart confirmation emails are already sent by cartBooking.service.ts
+        // after creating bookings. Do not send duplicate emails here.
+        // Commenting out to prevent duplicate email issue.
+        /*
         // Send cart confirmation email after payment success
         if (bookingResult.success && bookingData?.contactInfo?.email) {
           try {
@@ -517,6 +521,7 @@ export class PaymentController {
             });
           }
         }
+        */
 
       } else {
         // Handle single booking - find existing booking by payment intent ID
