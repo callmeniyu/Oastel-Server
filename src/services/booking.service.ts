@@ -203,78 +203,337 @@ class BookingService {
   }
 
   // Idempotent handler for Stripe successful payments
-  async handleStripeSuccess(opts: { bookingId?: string; paymentIntentId?: string; sessionId?: string; amount?: number; currency?: string; }) {
-    try {
-      const filter: any = {};
-      if (opts.bookingId) filter._id = opts.bookingId;
-      if (opts.paymentIntentId) filter['paymentInfo.stripePaymentIntentId'] = opts.paymentIntentId;
-      if (opts.sessionId) filter['paymentInfo.stripeSessionId'] = opts.sessionId;
+  // ENHANCED: Creates bookings from metadata if no existing booking found
+  async handleStripeSuccess(opts: { bookingId?: string; paymentIntentId?: string; sessionId?: string; amount?: number; currency?: string; metadata?: any; }) {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 2000; // 2 seconds
 
-      // Only update if not already marked succeeded
-      const update: any = {
-        'paymentInfo.paymentStatus': 'succeeded',
-        status: 'confirmed',
-        'paymentInfo.updatedAt': new Date(),
-      };
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`[WEBHOOK] 🔄 Processing payment success (attempt ${attempt}/${MAX_RETRIES})`);
+        console.log(`[WEBHOOK] Payment Intent ID: ${opts.paymentIntentId}`);
+        console.log(`[WEBHOOK] Booking ID from metadata: ${opts.bookingId || 'NOT PROVIDED'}`);
 
-      if (typeof opts.amount === 'number') update['paymentInfo.amount'] = opts.amount;
-      if (opts.currency) update['paymentInfo.currency'] = opts.currency;
+        const filter: any = {};
+        if (opts.bookingId) filter._id = opts.bookingId;
+        if (opts.paymentIntentId) filter['paymentInfo.stripePaymentIntentId'] = opts.paymentIntentId;
+        if (opts.sessionId) filter['paymentInfo.stripeSessionId'] = opts.sessionId;
 
-      const booking = await BookingModel.findOneAndUpdate(
-        { ...filter, $or: [ { 'paymentInfo.paymentStatus': { $exists: false } }, { 'paymentInfo.paymentStatus': { $ne: 'succeeded' } } ] },
-        { $set: update },
-        { new: true }
-      ).populate('packageId');
+        // Only update if not already marked succeeded
+        const update: any = {
+          'paymentInfo.paymentStatus': 'succeeded',
+          status: 'confirmed',
+          'paymentInfo.updatedAt': new Date(),
+        };
 
-      if (booking) {
-        console.log(`✅ Booking ${booking._id} marked confirmed via Stripe event`);
-        
-        // Send confirmation email using existing Brevo service
-        try {
-          const emailService = new EmailService();
+        if (typeof opts.amount === 'number') update['paymentInfo.amount'] = opts.amount;
+        if (opts.currency) update['paymentInfo.currency'] = opts.currency;
+
+        let booking = await BookingModel.findOneAndUpdate(
+          { ...filter, $or: [ { 'paymentInfo.paymentStatus': { $exists: false } }, { 'paymentInfo.paymentStatus': { $ne: 'succeeded' } } ] },
+          { $set: update },
+          { new: true }
+        ).populate('packageId');
+
+        // CRITICAL FIX: If no booking found, create one from payment intent metadata
+        if (!booking && opts.metadata) {
+          console.log(`[WEBHOOK] ⚠️ No existing booking found. Attempting to create from metadata...`);
+          console.log(`[WEBHOOK] Metadata:`, JSON.stringify(opts.metadata, null, 2));
           
-          // Prepare email data for existing email service
-          const emailData = {
-            customerName: booking.contactInfo.name,
-            customerEmail: booking.contactInfo.email,
-            bookingId: booking._id.toString(),
-            packageId: booking.packageId._id.toString(),
-            packageName: booking.packageId.name,
-            packageType: booking.packageType,
-            from: booking.from,
-            to: booking.to,
-            date: (() => {
-              const { formatDateAsMalaysiaTimezone } = require('../utils/dateUtils');
-              return formatDateAsMalaysiaTimezone(booking.date);
-            })(), // Format date as YYYY-MM-DD in Malaysia timezone
-            time: booking.time,
-            adults: booking.adults,
-            children: booking.children,
-            pickupLocation: booking.pickupLocation,
-            pickupGuidelines: booking.packageId.pickupGuidelines,
-            total: booking.total,
-            currency: booking.paymentInfo.currency || 'MYR',
-            isVehicleBooking: booking.isVehicleBooking,
-            vehicleName: booking.vehicleName,
-            vehicleSeatCapacity: booking.vehicleSeatCapacity,
-          };
+          booking = await this.createBookingFromMetadata(opts.metadata, opts.paymentIntentId!, opts.amount, opts.currency);
           
-          const emailSent = await emailService.sendBookingConfirmation(emailData);
-          if (emailSent) {
-            console.log(`📧 Confirmation email sent to ${booking.contactInfo.email} for booking ${booking._id}`);
+          if (booking) {
+            console.log(`[WEBHOOK] ✅ Booking ${booking._id} created from webhook metadata`);
           } else {
-            console.warn(`⚠️ Failed to send confirmation email for booking ${booking._id}`);
+            console.error(`[WEBHOOK] ❌ Failed to create booking from metadata`);
+            throw new Error('Failed to create booking from metadata');
           }
-        } catch (emailError) {
-          console.error(`❌ Error sending confirmation email for booking ${booking._id}:`, emailError);
-          // Don't fail the payment processing if email fails
         }
+
+        if (booking) {
+          console.log(`[WEBHOOK] ✅ Booking ${booking._id} marked confirmed via Stripe event`);
+          
+          // Send confirmation email using existing Brevo service
+          try {
+            const emailService = new EmailService();
+            
+            // Prepare email data for existing email service
+            const emailData = {
+              customerName: booking.contactInfo.name,
+              customerEmail: booking.contactInfo.email,
+              bookingId: booking._id.toString(),
+              packageId: booking.packageId._id.toString(),
+              packageName: booking.packageId.name,
+              packageType: booking.packageType,
+              from: booking.from,
+              to: booking.to,
+              date: (() => {
+                const { formatDateAsMalaysiaTimezone } = require('../utils/dateUtils');
+                return formatDateAsMalaysiaTimezone(booking.date);
+              })(), // Format date as YYYY-MM-DD in Malaysia timezone
+              time: booking.time,
+              adults: booking.adults,
+              children: booking.children,
+              pickupLocation: booking.pickupLocation,
+              pickupGuidelines: booking.packageId.pickupGuidelines,
+              total: booking.total,
+              currency: booking.paymentInfo.currency || 'MYR',
+              isVehicleBooking: booking.isVehicleBooking,
+              vehicleName: booking.vehicleName,
+              vehicleSeatCapacity: booking.vehicleSeatCapacity,
+            };
+            
+            const emailSent = await emailService.sendBookingConfirmation(emailData);
+            if (emailSent) {
+              console.log(`[WEBHOOK] 📧 Confirmation email sent to ${booking.contactInfo.email} for booking ${booking._id}`);
+            } else {
+              console.warn(`[WEBHOOK] ⚠️ Failed to send confirmation email for booking ${booking._id}`);
+            }
+          } catch (emailError) {
+            console.error(`[WEBHOOK] ❌ Error sending confirmation email for booking ${booking._id}:`, emailError);
+            // Don't fail the payment processing if email fails
+          }
+        } else {
+          console.error(`[WEBHOOK] ❌ No booking found or created for payment ${opts.paymentIntentId}`);
+        }
+
+        return booking;
+      } catch (err: any) {
+        console.error(`[WEBHOOK] Error in handleStripeSuccess (attempt ${attempt}/${MAX_RETRIES}):`, err);
+        
+        // Check if it's a network/timeout error that's worth retrying
+        const isRetryableError = err.name === 'MongoNetworkError' || 
+                                err.name === 'MongoNetworkTimeoutError' ||
+                                err.message?.includes('timeout') ||
+                                err.message?.includes('ECONNRESET');
+        
+        if (attempt < MAX_RETRIES && isRetryableError) {
+          console.log(`[WEBHOOK] ⏳ Retrying in ${RETRY_DELAY}ms due to network error...`);
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * attempt)); // Exponential backoff
+          continue;
+        }
+        
+        // If not retryable or max retries reached, throw error
+        throw err;
+      }
+    }
+    
+    throw new Error('Max retries reached for handleStripeSuccess');
+  }
+
+  // Create booking from payment intent metadata (webhook fallback)
+  private async createBookingFromMetadata(metadata: any, paymentIntentId: string, amount?: number, currency?: string): Promise<any> {
+    try {
+      console.log(`[WEBHOOK] 🔧 Creating booking from metadata...`);
+
+      // Extract required fields from metadata
+      const packageType = metadata.packageType;
+      const packageId = metadata.packageId;
+      const date = metadata.date;
+      const time = metadata.time;
+      const adults = parseInt(metadata.adults || '1');
+      const children = parseInt(metadata.children || '0');
+      const customerEmail = metadata.customerEmail;
+      const customerName = metadata.customerName;
+
+      // Validate required fields
+      if (!packageType || !packageId || !date || !time || !customerEmail || !customerName) {
+        console.error(`[WEBHOOK] ❌ Missing required metadata fields:`, {
+          packageType,
+          packageId,
+          date,
+          time,
+          customerEmail,
+          customerName
+        });
+        return null;
       }
 
+      // Parse date (handle ISO string)
+      const { parseDateAsMalaysiaTimezone } = require('../utils/dateUtils');
+      const bookingDate = date.includes('T') ? new Date(date) : parseDateAsMalaysiaTimezone(date);
+
+      // Get package details
+      const PackageModel = packageType === 'tour' ? mongoose.model('Tour') : mongoose.model('Transfer');
+      const packageDetails = await PackageModel.findById(packageId);
+
+      if (!packageDetails) {
+        console.error(`[WEBHOOK] ❌ Package not found: ${packageId}`);
+        return null;
+      }
+
+      // Calculate total from amount or package price
+      const calculatedTotal = amount || (packageDetails.price * adults);
+
+      // Create booking data - BYPASS TIME VALIDATION by using createBookingDirectWebhook
+      const bookingData = {
+        packageType,
+        packageId: new mongoose.Types.ObjectId(packageId),
+        date: bookingDate,
+        time,
+        adults,
+        children,
+        pickupLocation: metadata.pickupLocation || packageDetails.pickupLocation || 'To be confirmed',
+        contactInfo: {
+          name: customerName,
+          email: customerEmail,
+          phone: metadata.customerPhone || 'Not provided',
+          whatsapp: metadata.customerWhatsapp || metadata.customerPhone || ''
+        },
+        subtotal: calculatedTotal,
+        total: calculatedTotal,
+        paymentInfo: {
+          amount: calculatedTotal,
+          bankCharge: Math.round(calculatedTotal * 0.028 * 100) / 100,
+          currency: currency || 'MYR',
+          paymentStatus: 'succeeded',
+          stripePaymentIntentId: paymentIntentId,
+          paymentMethod: 'stripe'
+        },
+        isVehicleBooking: packageDetails.type === 'Private',
+        vehicleSeatCapacity: packageDetails.seatCapacity
+      };
+
+      console.log(`[WEBHOOK] 📝 Creating booking with data:`, {
+        packageType,
+        packageId,
+        date: bookingDate,
+        time,
+        customerEmail,
+        total: calculatedTotal
+      });
+
+      // Create booking using special webhook method that bypasses time validation
+      const booking = await this.createBookingDirectWebhook(bookingData);
+      
       return booking;
-    } catch (err) {
-      console.error('Error in handleStripeSuccess:', err);
-      throw err;
+    } catch (error) {
+      console.error(`[WEBHOOK] Error creating booking from metadata:`, error);
+      return null;
+    }
+  }
+
+  // Special booking creation method for webhooks - BYPASSES time validation
+  private async createBookingDirectWebhook(data: any): Promise<any> {
+    try {
+      console.log(`[WEBHOOK] 🚀 Creating booking via webhook (bypassing time validation)...`);
+
+      // Create user if doesn't exist
+      let userId: mongoose.Types.ObjectId | null = null;
+      
+      try {
+        const UserModel = mongoose.model('User');
+        let user = await UserModel.findOne({ email: data.contactInfo.email });
+        
+        if (!user) {
+          console.log(`[WEBHOOK] Creating new user for email: ${data.contactInfo.email}`);
+          user = new UserModel({
+            name: data.contactInfo.name,
+            email: data.contactInfo.email,
+            phone: data.contactInfo.phone,
+            role: 'user',
+            isVerified: true,
+            createdAt: new Date()
+          });
+          await user.save();
+          console.log(`[WEBHOOK] ✅ Created user with ID: ${user._id}`);
+        }
+        
+        userId = user._id;
+      } catch (userError) {
+        console.error('[WEBHOOK] Error creating/finding user:', userError);
+      }
+
+      // Get package details
+      const PackageModel = data.packageType === 'tour' ? mongoose.model('Tour') : mongoose.model('Transfer');
+      const packageDetails = await PackageModel.findById(data.packageId);
+
+      if (!packageDetails) {
+        throw new Error('Package not found');
+      }
+
+      const totalGuests = data.adults + data.children;
+
+      // CRITICAL: For webhooks, we SKIP time validation since payment already succeeded
+      // Check only slot availability, not booking window
+      const { formatDateAsMalaysiaTimezone } = require('../utils/dateUtils');
+      const slotDateStr = formatDateAsMalaysiaTimezone(data.date);
+
+      // Check basic availability without time restrictions
+      const requestedPersons = data.isVehicleBooking ? 1 : totalGuests;
+      const { checkAvailabilityWebhook } = require('./timeSlot.service');
+      
+      const availability = await TimeSlotService.checkAvailabilityWebhook(
+        data.packageType,
+        data.packageId,
+        slotDateStr,
+        data.time,
+        requestedPersons
+      );
+
+      if (!availability.available) {
+        console.warn(`[WEBHOOK] ⚠️ Slot not available but payment succeeded. Creating booking anyway.`);
+        // Continue creating booking even if slot appears unavailable
+      }
+
+      // Create booking
+      const booking = new BookingModel({
+        userId: userId,
+        packageType: data.packageType,
+        packageId: data.packageId,
+        slotId: null,
+        date: data.date,
+        time: data.time,
+        adults: data.adults,
+        children: data.children,
+        pickupLocation: data.pickupLocation,
+        status: 'confirmed', // Already confirmed since payment succeeded
+        contactInfo: data.contactInfo,
+        paymentInfo: data.paymentInfo,
+        subtotal: data.subtotal,
+        total: data.total,
+        firstBookingMinimum: false,
+        isVehicleBooking: data.isVehicleBooking || false,
+        vehicleSeatCapacity: data.vehicleSeatCapacity
+      });
+
+      const savedBooking = await booking.save();
+      console.log(`[WEBHOOK] ✅ Booking created with ID: ${savedBooking._id}`);
+
+      // Update slot counts
+      const isPrivate = packageDetails && (packageDetails.type === 'Private' || packageDetails.type === 'private');
+      const updateCount = isPrivate && data.packageType === 'transfer' ? 1 : totalGuests;
+
+      try {
+        await TimeSlotService.updateSlotBooking(
+          data.packageType,
+          data.packageId,
+          slotDateStr,
+          data.time,
+          updateCount,
+          'add'
+        );
+        console.log(`[WEBHOOK] ✅ Updated slot booking count by ${updateCount}`);
+      } catch (slotError) {
+        console.error('[WEBHOOK] ⚠️ Failed to update slot count:', slotError);
+        // Continue anyway - booking is created
+      }
+
+      // Update package bookedCount
+      try {
+        await PackageModel.findByIdAndUpdate(
+          data.packageId,
+          { $inc: { bookedCount: updateCount } }
+        );
+        console.log(`[WEBHOOK] ✅ Updated package bookedCount by ${updateCount}`);
+      } catch (countError) {
+        console.error('[WEBHOOK] ⚠️ Failed to update package count:', countError);
+      }
+
+      return savedBooking;
+    } catch (error) {
+      console.error('[WEBHOOK] Error creating booking via webhook:', error);
+      throw error;
     }
   }
 

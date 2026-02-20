@@ -45,7 +45,16 @@ export async function stripeWebhook(req: Request, res: Response) {
         const intent = event.data.object as Stripe.PaymentIntent;
         const bookingId = intent.metadata?.bookingId;
         const amount = intent.amount ? (intent.amount / 100) : undefined;
-        await BookingService.handleStripeSuccess({ bookingId, paymentIntentId: intent.id, amount, currency: intent.currency });
+        console.log(`[WEBHOOK] 💳 Payment succeeded: ${intent.id}`);
+        console.log(`[WEBHOOK] Metadata:`, JSON.stringify(intent.metadata, null, 2));
+        // Pass full metadata to allow booking creation from payment intent data
+        await BookingService.handleStripeSuccess({ 
+          bookingId, 
+          paymentIntentId: intent.id, 
+          amount, 
+          currency: intent.currency,
+          metadata: intent.metadata // CRITICAL: Pass metadata for fallback booking creation
+        });
         break;
       }
       case 'payment_intent.payment_failed': {

@@ -195,6 +195,90 @@ export class TimeSlotService {
     }
 
     /**
+     * WEBHOOK-SPECIFIC: Check availability WITHOUT time validation
+     * Used when processing already-successful payments via webhooks
+     * Bypasses the 10-hour booking window restriction
+     */
+    static async checkAvailabilityWebhook(
+        packageType: "tour" | "transfer",
+        packageId: Types.ObjectId,
+        date: string,
+        time: string,
+        requestedPersons: number
+    ): Promise<{
+        available: boolean
+        availableSlots: number
+        reason?: string
+    }> {
+        try {
+            console.log(`[WEBHOOK] Checking availability (bypassing time validation)`)
+
+            // Get package details to check if it's private
+            let packageDoc: any = null
+            if (packageType === "tour") {
+                packageDoc = await Tour.findById(packageId)
+            } else {
+                packageDoc = await Transfer.findById(packageId)
+            }
+
+            if (!packageDoc) {
+                return {
+                    available: false,
+                    availableSlots: 0,
+                    reason: "Package not found"
+                }
+            }
+
+            // Find the time slot
+            const timeSlot = await TimeSlot.findOne({
+                packageType,
+                packageId,
+                date
+            })
+
+            if (!timeSlot) {
+                // For webhooks, if no slot exists, consider it available (will be created)
+                console.warn(`[WEBHOOK] No time slot found, will create on-the-fly`)
+                return {
+                    available: true,
+                    availableSlots: 999,
+                    reason: undefined
+                }
+            }
+
+            // Find the specific time slot
+            const slot = timeSlot.slots.find(s => s.time === time)
+            if (!slot) {
+                // For webhooks, if slot doesn't exist, consider it available
+                console.warn(`[WEBHOOK] Time slot ${time} not found, will create on-the-fly`)
+                return {
+                    available: true,
+                    availableSlots: 999,
+                    reason: undefined
+                }
+            }
+
+            const availableSlots = slot.capacity - slot.bookedCount
+            
+            // For webhooks, we're more lenient - if payment succeeded, we create the booking
+            // even if capacity appears full (overbooking is better than losing paid bookings)
+            return {
+                available: true, // Always true for webhooks
+                availableSlots: Math.max(0, availableSlots),
+                reason: availableSlots < 0 ? "Slot overbooked due to successful payment" : undefined
+            }
+        } catch (error) {
+            console.error("[WEBHOOK] Error checking availability:", error)
+            // For webhooks, return available=true to ensure booking creation
+            return {
+                available: true,
+                availableSlots: 999,
+                reason: "Error checking availability, proceeding with booking"
+            }
+        }
+    }
+
+    /**
      * Update slot booking count when a booking is made
      * ROBUST IMPLEMENTATION: Handles minimumPerson logic correctly
      */

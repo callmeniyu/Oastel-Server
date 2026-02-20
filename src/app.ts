@@ -19,6 +19,7 @@ import vehicleRoutes from "./routes/vehicle.routes"
 import rollingTimeslotRoutes from "./routes/rollingTimeslot.routes"
 import paymentRoutes from "./routes/payment.routes"
 import paymentDebugRoutes from "./routes/paymentDebug.routes"
+import recoveryRoutes from "./routes/recovery.routes"
 import { PaymentCleanupService } from "./services/paymentCleanup.service"
 
 const app = express()
@@ -56,6 +57,8 @@ app.use("/api/rolling-timeslots", rollingTimeslotRoutes)
 app.use("/api/payments", paymentRoutes)
 // Payment debugging
 app.use("/api/payment-debug", paymentDebugRoutes)
+// Payment recovery (orphaned payments, manual booking creation)
+app.use("/api/recovery", recoveryRoutes)
 
 // Automatic payment cleanup disabled - can be triggered manually via API if needed
 // Manual cleanup endpoint: POST /api/payment/cleanup-abandoned

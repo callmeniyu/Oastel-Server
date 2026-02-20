@@ -2,6 +2,7 @@ import { Request, Response } from "express"
 import { Types } from "mongoose"
 import Transfer, { TransferType } from "../models/Transfer"
 import Vehicle from "../models/Vehicle"
+import Booking from "../models/Booking"
 import { generateSlug } from "../utils/generateSlug"
 import { TimeSlotService } from "../services/timeSlot.service"
 
@@ -429,6 +430,18 @@ export const deleteTransfer = async (req: Request, res: Response) => {
                 success: false,
                 message: "Transfer not found",
             })
+        }
+
+        // Delete all bookings for this transfer
+        try {
+            const deleteResult = await Booking.deleteMany({
+                packageId: transfer._id,
+                packageType: "transfer"
+            })
+            console.log(`Deleted ${deleteResult.deletedCount} booking(s) for transfer: ${transfer._id}`)
+        } catch (bookingError) {
+            console.error("Error deleting bookings for transfer:", bookingError)
+            // Don't fail the transfer deletion if booking deletion fails
         }
 
         // Delete all time slots for this transfer
