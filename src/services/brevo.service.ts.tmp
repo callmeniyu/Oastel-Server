@@ -594,7 +594,6 @@ export class BrevoEmailService {
           </div>
         </div>
 
-        ${booking.packageType === 'tour' ? `
         <div class="info-box">
           <h3 style="color: #8c7a00; margin-bottom: 10px; font-weight: 600;">Important Information:</h3>
           <ul style="color: #8c7a00; padding-left: 20px; line-height: 1.8;">
@@ -607,32 +606,11 @@ export class BrevoEmailService {
                 <li>No refund, cancellation, or date change within 72 hours.</li>
               </ul>
             </li>
-            <li>Entrance fees and all food and beverages are not included in the package price.</li>
+            <li>Entrance fees and all food and beverages are not included in the package price.</li>
             <li>${getLuggageInfo(booking.packageType)}</li>
             <li>Views depend on the weather and cannot be guaranteed.</li>
           </ul>
         </div>
-        ` : `
-        <div class="info-box">
-          <h3 style="color: #8c7a00; margin-bottom: 10px; font-weight: 600;">Important Information</h3>
-          <ul style="color: #8c7a00; padding-left: 20px; line-height: 1.8;">
-            <li>Please be at your hotel’s main entrance at least 5 minutes before pick up time.</li>
-            <li>Child seats are not provided. Children must be accompanied by an adult at all times.</li>
-            <li>Pick up times and locations may vary depending on the booking.</li>
-            <li>Each guest may bring 1 large bag and 1 hand carry only.</li>
-          </ul>
-          <h4 style="color: #8c7a00; margin-top: 12px; margin-bottom: 6px; font-weight: 600;">Cancellation Policy</h4>
-          <ul style="color: #8c7a00; padding-left: 20px; line-height: 1.8; margin-top:0;">
-            <li>Cancel at least 72 hours before departure for a full refund.</li>
-            <li>No refund, cancellation, or date changes within 72 hours of departure.</li>
-          </ul>
-          <h4 style="color: #8c7a00; margin-top: 12px; margin-bottom: 6px; font-weight: 600;">Personal Belongings</h4>
-          <ul style="color: #8c7a00; padding-left: 20px; line-height: 1.8; margin-top:0;">
-            <li>Guests are responsible for their own personal items.</li>
-            <li>Oastel is not liable for any lost or missing belongings during the transfer .</li>
-          </ul>
-        </div>
-        `}
 
         ${booking.pickupGuidelines ? `
         <div class="info-box" style="background: #e8f8f5; border: 1px solid #0C7157;">
