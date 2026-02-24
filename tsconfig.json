@@ -13,6 +13,6 @@
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true
     },
-    "include": ["src/**/*", "test-email.ts"],
+    "include": ["src/**/*", "src/test-email.ts"],
     "exclude": ["node_modules", "dist"]
 }

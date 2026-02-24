@@ -127,15 +127,18 @@ export class PaymentController {
           enabled: true,
         },
         metadata: {
+          platform: 'oastel', // Platform identifier to distinguish from mossyforestours
           bookingType: 'single',
           packageType: bookingData.packageType || '',
           packageId: bookingData.packageId || '',
+          packageName: bookingData.packageName || bookingData.title || '',
           // Include bookingId in metadata if provided so webhooks can map back
           bookingId: bookingData._id || bookingData.bookingId || '',
           date: bookingData.date || '',
           time: bookingData.time || '',
           adults: bookingData.adults?.toString() || '0',
           children: bookingData.children?.toString() || '0',
+          totalGuests: ((bookingData.adults || 0) + (bookingData.children || 0)).toString(),
           customerEmail: bookingData.contactInfo?.email || '',
           customerName: bookingData.contactInfo?.name || '',
           idempotencyKey, // Add idempotency key to metadata for tracking
@@ -260,6 +263,7 @@ export class PaymentController {
           enabled: true,
         },
         metadata: {
+          platform: 'oastel', // Platform identifier to distinguish from mossyforestours
           bookingType: 'cart',
           itemCount: cartData.items.length.toString(),
           customerEmail: contactInfo.email || '',

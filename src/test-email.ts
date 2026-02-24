@@ -1,6 +1,6 @@
-import './src/config/env'; // Load environment variables
-import { BrevoEmailService } from './src/services/brevo.service';
-import { BookingEmailData } from './src/services/email.service';
+import './config/env'; // Load environment variables
+import { BrevoEmailService } from './services/brevo.service';
+import { BookingEmailData } from './services/email.service';
 
 /**
  * Test Script to Preview Confirmation Email

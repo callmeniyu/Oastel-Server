@@ -45,6 +45,12 @@ export class PaymentRecoveryService {
 
       for (const intent of paymentIntents.data) {
         if (intent.status === 'succeeded') {
+          // IMPORTANT: Only process payments from 'oastel' platform to avoid mossyforestours bookings
+          if (intent.metadata?.platform !== 'oastel') {
+            console.log(`[RECOVERY] ⏭️ SKIPPING: Payment ${intent.id} from different platform (${intent.metadata?.platform || 'unknown'})`);
+            continue;
+          }
+
           // Check if booking exists for this payment intent
           const booking = await BookingModel.findOne({
             $or: [
@@ -63,6 +69,8 @@ export class PaymentRecoveryService {
               customerName: intent.metadata?.customerName,
               packageType: intent.metadata?.packageType,
               packageId: intent.metadata?.packageId,
+              packageName: intent.metadata?.packageName || 'N/A',
+              totalGuests: intent.metadata?.totalGuests || intent.metadata?.adults || '0',
               date: intent.metadata?.date,
               time: intent.metadata?.time,
               created: new Date(intent.created * 1000),
