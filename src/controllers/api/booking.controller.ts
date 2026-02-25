@@ -159,6 +159,8 @@ export async function createBooking(req: Request, res: Response) {
       const emailData = {
         customerName: contactInfo.name,
         customerEmail: contactInfo.email,
+        customerPhone: contactInfo.phone,
+        customerWhatsapp: contactInfo.whatsapp || contactInfo.phone,
         bookingId: (booking as any)._id.toString(),
         packageId: packageId,
         packageName: packageDetails?.title || (packageType === 'tour' ? 'Tour Package' : 'Transfer Service'),

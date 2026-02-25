@@ -119,6 +119,23 @@ export class PaymentController {
 
       console.log('[PAYMENT] Creating Stripe payment intent with amount:', amountInCents, 'cents');
 
+      // Fetch package details to get package name for metadata
+      let packageName = bookingData.packageName || bookingData.title || '';
+      if (!packageName && bookingData.packageId && bookingData.packageType) {
+        try {
+          const mongoose = require('mongoose');
+          const PackageModel = bookingData.packageType === 'tour' 
+            ? mongoose.model('Tour') 
+            : mongoose.model('Transfer');
+          const packageDetails = await PackageModel.findById(bookingData.packageId).select('title name');
+          if (packageDetails) {
+            packageName = packageDetails.title || packageDetails.name || '';
+          }
+        } catch (fetchError) {
+          console.warn('[PAYMENT] Failed to fetch package name:', fetchError);
+        }
+      }
+
       // Create payment intent
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amountInCents,
@@ -131,7 +148,7 @@ export class PaymentController {
           bookingType: 'single',
           packageType: bookingData.packageType || '',
           packageId: bookingData.packageId || '',
-          packageName: bookingData.packageName || bookingData.title || '',
+          packageName: packageName,
           // Include bookingId in metadata if provided so webhooks can map back
           bookingId: bookingData._id || bookingData.bookingId || '',
           date: bookingData.date || '',
@@ -141,6 +158,8 @@ export class PaymentController {
           totalGuests: ((bookingData.adults || 0) + (bookingData.children || 0)).toString(),
           customerEmail: bookingData.contactInfo?.email || '',
           customerName: bookingData.contactInfo?.name || '',
+          customerPhone: bookingData.contactInfo?.phone || '',
+          pickupLocation: bookingData.pickupLocation || '',
           idempotencyKey, // Add idempotency key to metadata for tracking
           ...metadata
         },
@@ -720,6 +739,8 @@ export class PaymentController {
             const emailData: any = {
               customerName: bookingData.contactInfo.name,
               customerEmail: bookingData.contactInfo.email,
+              customerPhone: bookingData.contactInfo.phone,
+              customerWhatsapp: bookingData.contactInfo.whatsapp || bookingData.contactInfo.phone,
               bookingId: bookingResult.data._id.toString(),
               packageId: bookingData.packageId,
               packageName: packageDetails?.title || (bookingData.packageType === 'tour' ? 'Tour Package' : 'Transfer Service'),

@@ -192,8 +192,7 @@ export const getTourBySlug = async (req: Request, res: Response) => {
         // Debug: log FAQ count and a short sample to help diagnose production truncation issues
         try {
             if (tour && tour.details && Array.isArray(tour.details.faq)) {
-                console.log(`getTourBySlug - slug=${slug} - faqCount=${tour.details.faq.length}`)
-                console.log(`getTourBySlug - faqSample=`, tour.details.faq.slice(0, 5))
+                console.log(`FAQs are succesfully fetched`)
             } else {
                 console.log(`getTourBySlug - slug=${slug} - no faqs present`)
             }

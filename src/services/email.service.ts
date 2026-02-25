@@ -7,6 +7,8 @@ import { parseFlexibleDate } from '../utils/dateUtils';
 export interface BookingEmailData {
   customerName: string;
   customerEmail: string;
+  customerPhone?: string;
+  customerWhatsapp?: string;
   bookingId: string;
   packageId: string;
   packageName: string;

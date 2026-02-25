@@ -20,6 +20,8 @@ export class BrevoEmailService {
       console.log('📧 Sending booking confirmation via Brevo API...');
       console.log('To:', booking.customerEmail);
       console.log('Package:', booking.packageName);
+      console.log('Phone:', booking.customerPhone);
+      console.log('WhatsApp:', booking.customerWhatsapp);
 
       const html = this.generateBookingConfirmationHTML(booking);
       
@@ -171,7 +173,6 @@ export class BrevoEmailService {
 
       console.log('📧 Sending booking notification to admin via Brevo API...');
       console.log('Admin email:', emailConfig.templates.notificationEmail);
-      console.log('Package:', booking.packageName);
 
       const html = this.generateBookingNotificationHTML(booking);
       
@@ -1025,6 +1026,18 @@ export class BrevoEmailService {
                         <span class="detail-label">Email:</span>
                         <span class="detail-value">${booking.customerEmail}</span>
                     </div>
+                    ${booking.customerPhone ? `
+                    <div class="detail-row">
+                        <span class="detail-label">Phone:</span>
+                        <span class="detail-value">${booking.customerPhone}</span>
+                    </div>
+                    ` : ''}
+                    ${booking.customerWhatsapp && booking.customerWhatsapp !== booking.customerPhone ? `
+                    <div class="detail-row">
+                        <span class="detail-label">WhatsApp:</span>
+                        <span class="detail-value">${booking.customerWhatsapp}</span>
+                    </div>
+                    ` : ''}
                     <div class="detail-row">
                         <span class="detail-label">Date:</span>
                         <span class="detail-value">${formatDate(booking.date)}</span>

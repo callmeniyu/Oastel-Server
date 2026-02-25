@@ -233,7 +233,15 @@ class BookingService {
           { ...filter, $or: [ { 'paymentInfo.paymentStatus': { $exists: false } }, { 'paymentInfo.paymentStatus': { $ne: 'succeeded' } } ] },
           { $set: update },
           { new: true }
-        ).populate('packageId');
+        );
+
+        // Explicitly populate with the correct capitalized model name.
+        // refPath: "packageType" fails because packageType values are lowercase ('tour'/'transfer')
+        // but models are registered as 'Tour'/'Transfer'.
+        if (booking) {
+          const packageModelName = booking.packageType === 'tour' ? 'Tour' : 'Transfer';
+          await booking.populate({ path: 'packageId', model: packageModelName });
+        }
 
         // CRITICAL FIX: If no booking found, create one from payment intent metadata
         if (!booking && opts.metadata) {
@@ -257,13 +265,22 @@ class BookingService {
           try {
             const emailService = new EmailService();
             
+            console.log('[WEBHOOK] Booking contactInfo:', JSON.stringify(booking.contactInfo, null, 2));
+            console.log('[WEBHOOK] PackageId details:', JSON.stringify({
+              id: booking.packageId._id,
+              title: booking.packageId.title,
+              type: typeof booking.packageId
+            }, null, 2));
+            
             // Prepare email data for existing email service
             const emailData = {
               customerName: booking.contactInfo.name,
               customerEmail: booking.contactInfo.email,
+              customerPhone: booking.contactInfo.phone,
+              customerWhatsapp: booking.contactInfo.whatsapp,
               bookingId: booking._id.toString(),
               packageId: booking.packageId._id.toString(),
-              packageName: booking.packageId.name,
+              packageName: booking.packageId.title,
               packageType: booking.packageType,
               from: booking.from,
               to: booking.to,
@@ -378,7 +395,7 @@ class BookingService {
           name: customerName,
           email: customerEmail,
           phone: metadata.customerPhone || 'Not provided',
-          whatsapp: metadata.customerWhatsapp || metadata.customerPhone || ''
+          whatsapp: metadata.customerPhone || '' // Use same phone for whatsapp since client has only one field
         },
         subtotal: calculatedTotal,
         total: calculatedTotal,
@@ -500,6 +517,16 @@ class BookingService {
       const savedBooking = await booking.save();
       console.log(`[WEBHOOK] ✅ Booking created with ID: ${savedBooking._id}`);
 
+      // Populate packageId with explicit model name.
+      // refPath: "packageType" fails because packageType values are lowercase ('tour'/'transfer')
+      // but models are registered as 'Tour'/'Transfer'.
+      const populatedBooking = await BookingModel.findById(savedBooking._id);
+      if (!populatedBooking) {
+        throw new Error('Failed to retrieve populated booking');
+      }
+      const webhookPackageModel = data.packageType === 'tour' ? 'Tour' : 'Transfer';
+      await populatedBooking.populate({ path: 'packageId', model: webhookPackageModel });
+
       // Update slot counts
       const isPrivate = packageDetails && (packageDetails.type === 'Private' || packageDetails.type === 'private');
       const updateCount = isPrivate && data.packageType === 'transfer' ? 1 : totalGuests;
@@ -530,7 +557,7 @@ class BookingService {
         console.error('[WEBHOOK] ⚠️ Failed to update package count:', countError);
       }
 
-      return savedBooking;
+      return populatedBooking;
     } catch (error) {
       console.error('[WEBHOOK] Error creating booking via webhook:', error);
       throw error;

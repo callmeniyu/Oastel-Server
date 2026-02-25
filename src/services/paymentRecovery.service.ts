@@ -221,7 +221,12 @@ export class PaymentRecoveryService {
           { 'paymentInfo.stripePaymentIntentId': paymentIntentId },
           { 'paymentInfo.paymentIntentId': paymentIntentId }
         ]
-      }).populate('packageId');
+      });
+      // Explicitly populate with the correct capitalized model name
+      if (booking) {
+        const packageModelName = booking.packageType === 'tour' ? 'Tour' : 'Transfer';
+        await booking.populate({ path: 'packageId', model: packageModelName });
+      }
 
       const response: any = {
         success: true,
@@ -239,7 +244,7 @@ export class PaymentRecoveryService {
           id: booking._id,
           status: booking.status,
           packageType: booking.packageType,
-          packageName: booking.packageId?.name,
+          packageName: (booking.packageId as any)?.title,
           date: booking.date,
           time: booking.time,
           customerEmail: booking.contactInfo.email,
