@@ -19,7 +19,6 @@ export interface TimeSlotType extends Document {
   isAvailable: boolean
   booked: number
   capacity: number
-  blackoutDate: boolean
   cutoffHours: number
 }
 
@@ -42,7 +41,6 @@ const TimeSlotSchema = new Schema<TimeSlotType>(
     isAvailable: { type: Boolean, default: true },
     booked: { type: Number, default: 0 },
     capacity: { type: Number, required: true },
-    blackoutDate: { type: Boolean, default: false },
     cutoffHours: { type: Number, default: 10 }, // Configurable cutoff hours
   },
   { timestamps: true }
