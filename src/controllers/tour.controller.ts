@@ -275,9 +275,10 @@ export const updateTour = async (req: Request, res: Response) => {
             })
         }
 
-        // Update time slots if departure times or capacity changed
+        // Update time slots if departure times, capacity, or minimumPerson changed
         try {
             const departureTimes = tourData.departureTimes || existingTour.departureTimes
+            const minimumPerson = tourData.minimumPerson !== undefined ? tourData.minimumPerson : existingTour.minimumPerson
             
             // Determine capacity based on tour type (same logic as creation)
             let capacity
@@ -315,15 +316,26 @@ export const updateTour = async (req: Request, res: Response) => {
                 existingCapacity = existingTour.maximumPerson || 10
             }
             
-            if (JSON.stringify(departureTimes) !== JSON.stringify(existingTour.departureTimes) || 
-                capacity !== existingCapacity) {
-                await TimeSlotService.updateSlotsForPackage(
+            // Check if critical fields changed (minimumPerson, capacity, or times)
+            const minimumPersonChanged = minimumPerson !== existingTour.minimumPerson
+            const capacityChanged = capacity !== existingCapacity
+            const timesChanged = JSON.stringify(departureTimes) !== JSON.stringify(existingTour.departureTimes)
+            
+            if (minimumPersonChanged || capacityChanged || timesChanged) {
+                console.log(`🔄 Critical field changes detected for tour ${tour._id}:`)
+                console.log(`   minimumPerson: ${existingTour.minimumPerson} → ${minimumPerson} (changed: ${minimumPersonChanged})`)
+                console.log(`   capacity: ${existingCapacity} → ${capacity} (changed: ${capacityChanged})`)
+                console.log(`   times: ${timesChanged ? 'CHANGED' : 'unchanged'}`)
+                
+                // Use the special method to update slots for 90 days from tomorrow
+                await TimeSlotService.updateSlotsFor90DaysFromTomorrow(
                     "tour",
                     tour._id as Types.ObjectId,
                     departureTimes,
-                    capacity
+                    capacity,
+                    minimumPerson
                 )
-                console.log(`Time slots updated for tour: ${tour._id}`)
+                console.log(`✅ Time slots updated for 90 days from tomorrow for tour: ${tour._id}`)
             }
         } catch (slotError) {
             console.error("Error updating time slots for tour:", slotError)

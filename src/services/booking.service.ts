@@ -397,7 +397,13 @@ class BookingService {
     try {
       console.log(`[WEBHOOK] 🔧 Creating booking from metadata...`);
 
-      // Extract required fields from metadata
+      // Check if this is a cart booking
+      if (metadata.bookingType === 'cart') {
+        console.log(`[WEBHOOK] 📦 Detected cart booking, processing cart items...`);
+        return await this.createCartBookingsFromMetadata(metadata, paymentIntentId, amount, currency);
+      }
+
+      // Extract required fields from metadata for single booking
       const packageType = metadata.packageType;
       const packageId = metadata.packageId;
       const date = metadata.date;
@@ -480,6 +486,139 @@ class BookingService {
       return booking;
     } catch (error) {
       console.error(`[WEBHOOK] Error creating booking from metadata:`, error);
+      return null;
+    }
+  }
+
+  // Create cart bookings from payment intent metadata (webhook fallback for cart)
+  private async createCartBookingsFromMetadata(metadata: any, paymentIntentId: string, amount?: number, currency?: string): Promise<any> {
+    try {
+      console.log(`[WEBHOOK] 📦 Creating cart bookings from metadata...`);
+
+      // Extract cart info from metadata
+      const customerEmail = metadata.customerEmail;
+      const customerName = metadata.customerName;
+      const userEmail = metadata.userEmail || customerEmail;
+
+      if (!customerEmail || !customerName) {
+        console.error(`[WEBHOOK] ❌ Missing customer info in cart metadata`);
+        return null;
+      }
+
+      // Find cart by user email
+      const CartModel = mongoose.model('Cart');
+      const cart: any = await CartModel.findOne({ userEmail: userEmail }).lean();
+
+      if (!cart || !cart.items || cart.items.length === 0) {
+        console.error(`[WEBHOOK] ❌ Cart not found or empty for user: ${userEmail}`);
+        return null;
+      }
+
+      console.log(`[WEBHOOK] 📦 Found cart with ${cart.items.length} item(s)`);
+
+      // Create user if doesn't exist
+      let userId: mongoose.Types.ObjectId | null = null;
+      
+      try {
+        const UserModel = mongoose.model('User');
+        let user = await UserModel.findOne({ email: customerEmail });
+        
+        if (!user) {
+          console.log(`[WEBHOOK] Creating new user for email: ${customerEmail}`);
+          user = new UserModel({
+            name: customerName,
+            email: customerEmail,
+            phone: metadata.customerPhone || 'Not provided',
+            role: 'user',
+            isVerified: true,
+            createdAt: new Date()
+          });
+          await user.save();
+          console.log(`[WEBHOOK] ✅ Created user with ID: ${user._id}`);
+        } else {
+          console.log(`[WEBHOOK] 👤 Found existing user with ID: ${user._id}`);
+        }
+        
+        userId = user._id;
+      } catch (userError) {
+        console.error('[WEBHOOK] Error creating/finding user:', userError);
+      }
+
+      // Create bookings for each cart item
+      const bookingIds = [];
+      const bookings = [];
+
+      for (const item of cart.items) {
+        try {
+          console.log(`[WEBHOOK]   Processing: ${item.packageTitle}`);
+
+          const bookingData = {
+            userId: userId,
+            packageType: item.packageType,
+            packageId: new mongoose.Types.ObjectId(item.packageId),
+            date: new Date(item.selectedDate),
+            time: item.selectedTime,
+            adults: item.adults,
+            children: item.children,
+            pickupLocation: item.pickupLocation || 'To be confirmed',
+            contactInfo: {
+              name: customerName,
+              email: customerEmail,
+              phone: metadata.customerPhone || 'Not provided',
+              whatsapp: metadata.customerPhone || ''
+            },
+            subtotal: item.totalPrice,
+            total: item.totalPrice,
+            paymentInfo: {
+              amount: amount || item.totalPrice,
+              bankCharge: Math.round((amount || item.totalPrice) * 0.028 * 100) / 100,
+              currency: currency || 'MYR',
+              paymentStatus: 'succeeded',
+              stripePaymentIntentId: paymentIntentId,
+              paymentMethod: 'stripe'
+            },
+            isVehicleBooking: item.isVehicleBooking || false,
+            vehicleName: item.vehicleName,
+            vehicleSeatCapacity: item.vehicleSeatCapacity
+          };
+
+          // Use the webhook booking creation method
+          const booking = await this.createBookingDirectWebhook(bookingData);
+          
+          if (booking) {
+            bookingIds.push(booking._id);
+            bookings.push(booking);
+            console.log(`[WEBHOOK]   ✅ Booking created: ${booking._id}`);
+          } else {
+            console.error(`[WEBHOOK]   ❌ Failed to create booking for ${item.packageTitle}`);
+          }
+        } catch (itemError) {
+          console.error(`[WEBHOOK]   ❌ Error creating booking for ${item.packageTitle}:`, itemError);
+          // Continue with next item even if one fails
+        }
+      }
+
+      if (bookings.length === 0) {
+        console.error(`[WEBHOOK] ❌ No bookings were created from cart`);
+        return null;
+      }
+
+      console.log(`[WEBHOOK] ✅ Created ${bookings.length} booking(s) from cart`);
+
+      // Clear the cart after successful bookings
+      try {
+        await CartModel.findByIdAndDelete(cart._id);
+        console.log(`[WEBHOOK] 🗑️  Cart cleared after successful booking`);
+      } catch (clearError) {
+        console.error(`[WEBHOOK] ⚠️  Failed to clear cart:`, clearError);
+        // Don't fail the entire process if cart clearing fails
+      }
+
+      // Return the first booking (for email sending compatibility)
+      // Or return all bookings if needed
+      return bookings[0];
+    } catch (error) {
+      console.error(`[WEBHOOK] Error creating cart bookings from metadata:`, error);
       return null;
     }
   }

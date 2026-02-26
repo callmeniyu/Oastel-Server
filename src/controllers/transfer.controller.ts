@@ -344,9 +344,11 @@ export const updateTransfer = async (req: Request, res: Response) => {
             })
         }
 
-        // Update time slots if times or capacity changed
+        // Update time slots if times, capacity, or minimumPerson changed
         try {
             const times = transferData.times || existingTransfer.times
+            const minimumPerson = transferData.minimumPerson !== undefined ? transferData.minimumPerson : existingTransfer.minimumPerson
+            
             // Determine capacity based on transfer type (same logic as creation)
             let capacity
             const transferType = transferData.type || existingTransfer.type
@@ -383,14 +385,26 @@ export const updateTransfer = async (req: Request, res: Response) => {
                 existingCapacity = existingTransfer.maximumPerson || 10
             }
             
-            if (JSON.stringify(times) !== JSON.stringify(existingTransfer.times) || capacity !== existingCapacity) {
-                await TimeSlotService.updateSlotsForPackage(
+            // Check if critical fields changed (minimumPerson, capacity, or times)
+            const minimumPersonChanged = minimumPerson !== existingTransfer.minimumPerson
+            const capacityChanged = capacity !== existingCapacity
+            const timesChanged = JSON.stringify(times) !== JSON.stringify(existingTransfer.times)
+            
+            if (minimumPersonChanged || capacityChanged || timesChanged) {
+                console.log(`🔄 Critical field changes detected for transfer ${transfer._id}:`)
+                console.log(`   minimumPerson: ${existingTransfer.minimumPerson} → ${minimumPerson} (changed: ${minimumPersonChanged})`)
+                console.log(`   capacity: ${existingCapacity} → ${capacity} (changed: ${capacityChanged})`)
+                console.log(`   times: ${timesChanged ? 'CHANGED' : 'unchanged'}`)
+                
+                // Use the special method to update slots for 90 days from tomorrow
+                await TimeSlotService.updateSlotsFor90DaysFromTomorrow(
                     "transfer",
                     transfer._id as Types.ObjectId,
                     times,
-                    capacity
+                    capacity,
+                    minimumPerson
                 )
-                console.log(`Time slots updated for transfer: ${transfer._id}`)
+                console.log(`✅ Time slots updated for 90 days from tomorrow for transfer: ${transfer._id}`)
             }
         } catch (slotError) {
             console.error("Error updating time slots for transfer:", slotError)
