@@ -214,9 +214,43 @@ class BookingService {
         console.log(`[WEBHOOK] Payment Intent ID: ${opts.paymentIntentId}`);
         console.log(`[WEBHOOK] Booking ID from metadata: ${opts.bookingId || 'NOT PROVIDED'}`);
 
+        // CRITICAL FIX: First check if ANY booking already exists for this payment intent
+        // This prevents race condition with client confirmation
+        if (opts.paymentIntentId) {
+          const existingBookingByPaymentIntent = await BookingModel.findOne({
+            $or: [
+              { 'paymentInfo.stripePaymentIntentId': opts.paymentIntentId },
+              { 'paymentInfo.paymentIntentId': opts.paymentIntentId }
+            ]
+          });
+
+          if (existingBookingByPaymentIntent) {
+            console.log(`[WEBHOOK] ✅ Booking already exists for payment intent ${opts.paymentIntentId}: ${existingBookingByPaymentIntent._id}`);
+            console.log(`[WEBHOOK] Payment status: ${existingBookingByPaymentIntent.paymentInfo.paymentStatus}`);
+            
+            // Update if still pending
+            if (existingBookingByPaymentIntent.paymentInfo.paymentStatus !== 'succeeded') {
+              console.log('[WEBHOOK] Updating existing booking payment status to succeeded');
+              await BookingModel.findByIdAndUpdate(
+                existingBookingByPaymentIntent._id,
+                { 
+                  $set: {
+                    'paymentInfo.paymentStatus': 'succeeded',
+                    'paymentInfo.stripePaymentIntentId': opts.paymentIntentId,
+                    status: 'confirmed',
+                    'paymentInfo.updatedAt': new Date()
+                  }
+                }
+              );
+            }
+            
+            // Return early - booking already handled
+            return;
+          }
+        }
+
         const filter: any = {};
         if (opts.bookingId) filter._id = opts.bookingId;
-        if (opts.paymentIntentId) filter['paymentInfo.stripePaymentIntentId'] = opts.paymentIntentId;
         if (opts.sessionId) filter['paymentInfo.stripeSessionId'] = opts.sessionId;
 
         // Only update if not already marked succeeded
@@ -226,6 +260,7 @@ class BookingService {
           'paymentInfo.updatedAt': new Date(),
         };
 
+        if (opts.paymentIntentId) update['paymentInfo.stripePaymentIntentId'] = opts.paymentIntentId;
         if (typeof opts.amount === 'number') update['paymentInfo.amount'] = opts.amount;
         if (opts.currency) update['paymentInfo.currency'] = opts.currency;
 
@@ -243,18 +278,37 @@ class BookingService {
           await booking.populate({ path: 'packageId', model: packageModelName });
         }
 
-        // CRITICAL FIX: If no booking found, create one from payment intent metadata
-        if (!booking && opts.metadata) {
+        // CRITICAL FIX: If no booking found by ID/session, create one from payment intent metadata
+        if (!booking && opts.metadata && opts.paymentIntentId) {
           console.log(`[WEBHOOK] ⚠️ No existing booking found. Attempting to create from metadata...`);
           console.log(`[WEBHOOK] Metadata:`, JSON.stringify(opts.metadata, null, 2));
           
-          booking = await this.createBookingFromMetadata(opts.metadata, opts.paymentIntentId!, opts.amount, opts.currency);
-          
-          if (booking) {
-            console.log(`[WEBHOOK] ✅ Booking ${booking._id} created from webhook metadata`);
-          } else {
-            console.error(`[WEBHOOK] ❌ Failed to create booking from metadata`);
-            throw new Error('Failed to create booking from metadata');
+          // Use try-catch to handle potential duplicate key error from unique index
+          try {
+            booking = await this.createBookingFromMetadata(opts.metadata, opts.paymentIntentId!, opts.amount, opts.currency);
+            
+            if (booking) {
+              console.log(`[WEBHOOK] ✅ Booking ${booking._id} created from webhook metadata`);
+            } else {
+              console.error(`[WEBHOOK] ❌ Failed to create booking from metadata`);
+              throw new Error('Failed to create booking from metadata');
+            }
+          } catch (createError: any) {
+            // If duplicate key error, another process already created the booking - fetch it
+            if (createError.code === 11000 && createError.message.includes('stripePaymentIntentId')) {
+              console.log('[WEBHOOK] 🔁 Duplicate prevented by unique index, fetching existing booking');
+              booking = await BookingModel.findOne({
+                'paymentInfo.stripePaymentIntentId': opts.paymentIntentId
+              });
+              if (booking) {
+                const packageModelName = booking.packageType === 'tour' ? 'Tour' : 'Transfer';
+                await booking.populate({ path: 'packageId', model: packageModelName });
+                console.log(`[WEBHOOK] ✅ Using existing booking ${booking._id} created by another process`);
+              }
+            } else {
+              // Re-throw if not a duplicate key error
+              throw createError;
+            }
           }
         }
 
@@ -514,8 +568,31 @@ class BookingService {
         vehicleSeatCapacity: data.vehicleSeatCapacity
       });
 
-      const savedBooking = await booking.save();
-      console.log(`[WEBHOOK] ✅ Booking created with ID: ${savedBooking._id}`);
+      // CRITICAL: Handle duplicate key error from unique index
+      let savedBooking;
+      try {
+        savedBooking = await booking.save();
+        console.log(`[WEBHOOK] ✅ Booking created with ID: ${savedBooking._id}`);
+      } catch (saveError: any) {
+        // Duplicate key error - booking already exists
+        if (saveError.code === 11000 && saveError.message.includes('stripePaymentIntentId')) {
+          console.log('[WEBHOOK] 🔁 Duplicate booking prevented by unique index');
+          // Fetch the existing booking instead
+          const existingBooking = await BookingModel.findOne({
+            'paymentInfo.stripePaymentIntentId': data.paymentInfo.stripePaymentIntentId
+          });
+          if (existingBooking) {
+            console.log(`[WEBHOOK] ✅ Using existing booking ${existingBooking._id}`);
+            savedBooking = existingBooking;
+          } else {
+            // This shouldn't happen, but handle it anyway
+            throw new Error('Duplicate key error but could not find existing booking');
+          }
+        } else {
+          // Re-throw if not a duplicate key error
+          throw saveError;
+        }
+      }
 
       // Populate packageId with explicit model name.
       // refPath: "packageType" fails because packageType values are lowercase ('tour'/'transfer')

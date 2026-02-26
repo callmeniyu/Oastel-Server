@@ -114,4 +114,26 @@ BookingSchema.index({ 'paymentInfo.stripeSessionId': 1 });
 BookingSchema.index({ createdAt: -1 });
 BookingSchema.index({ reviewEmailSent: 1, date: 1 }); // For review email scheduler
 
+// CRITICAL: Unique sparse index to prevent duplicate bookings with the same payment intent
+// Sparse index allows multiple null values but enforces uniqueness for non-null values
+BookingSchema.index({ 'paymentInfo.stripePaymentIntentId': 1 }, { 
+  unique: true, 
+  sparse: true,
+  name: 'unique_stripe_payment_intent' 
+});
+
+// Additional compound index to detect duplicate bookings based on key details
+// This catches duplicates even if payment intent differs (e.g., retry scenarios)
+BookingSchema.index(
+  { 
+    'contactInfo.email': 1, 
+    packageId: 1, 
+    date: 1, 
+    time: 1,
+    'paymentInfo.paymentStatus': 1,
+    createdAt: 1
+  },
+  { name: 'duplicate_booking_detection' }
+);
+
 export default mongoose.models.Booking || mongoose.model<Booking>("Booking", BookingSchema);
