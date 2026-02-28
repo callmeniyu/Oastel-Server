@@ -85,22 +85,22 @@ export class PaymentController {
         created: { gte: fiveMinutesAgo },
       });
 
-      const duplicateIntent = existingIntents.data.find((intent: any) => 
+      const duplicateIntent = existingIntents.data.find((intent: any) =>
         intent.metadata.packageId === bookingData.packageId &&
         intent.metadata.date === bookingData.date &&
         intent.metadata.time === bookingData.time &&
         intent.metadata.customerEmail === bookingData.contactInfo?.email &&
         intent.amount === Math.round(amount * 100) &&
-        (intent.status === 'requires_payment_method' || 
-         intent.status === 'requires_confirmation' || 
-         intent.status === 'requires_action' ||
-         intent.status === 'processing' ||
-         intent.status === 'succeeded')
+        (intent.status === 'requires_payment_method' ||
+          intent.status === 'requires_confirmation' ||
+          intent.status === 'requires_action' ||
+          intent.status === 'processing' ||
+          intent.status === 'succeeded')
       );
 
       if (duplicateIntent) {
         console.log('[PAYMENT] Found existing payment intent:', duplicateIntent.id, 'with status:', duplicateIntent.status);
-        
+
         // Return existing payment intent instead of creating a duplicate
         return res.json({
           success: true,
@@ -124,8 +124,8 @@ export class PaymentController {
       if (!packageName && bookingData.packageId && bookingData.packageType) {
         try {
           const mongoose = require('mongoose');
-          const PackageModel = bookingData.packageType === 'tour' 
-            ? mongoose.model('Tour') 
+          const PackageModel = bookingData.packageType === 'tour'
+            ? mongoose.model('Tour')
             : mongoose.model('Transfer');
           const packageDetails = await PackageModel.findById(bookingData.packageId).select('title name');
           if (packageDetails) {
@@ -163,11 +163,11 @@ export class PaymentController {
           idempotencyKey, // Add idempotency key to metadata for tracking
           ...metadata
         },
-        description: `Booking for ${bookingData.packageType} - ${bookingData.contactInfo?.name || 'Guest'}`,
+        description: `Oastel ${bookingData.packageType} - ${bookingData.contactInfo?.name || 'Guest'}`,
       },
-      {
-        idempotencyKey, // Stripe's built-in idempotency protection
-      });
+        {
+          idempotencyKey, // Stripe's built-in idempotency protection
+        });
 
       console.log('[PAYMENT] Payment intent created successfully:', paymentIntent.id);
 
@@ -243,20 +243,20 @@ export class PaymentController {
         created: { gte: fiveMinutesAgo },
       });
 
-      const duplicateIntent = existingIntents.data.find((intent: any) => 
+      const duplicateIntent = existingIntents.data.find((intent: any) =>
         intent.metadata.bookingType === 'cart' &&
         intent.metadata.customerEmail === contactInfo.email &&
         intent.amount === Math.round(amount * 100) &&
-        (intent.status === 'requires_payment_method' || 
-         intent.status === 'requires_confirmation' || 
-         intent.status === 'requires_action' ||
-         intent.status === 'processing' ||
-         intent.status === 'succeeded')
+        (intent.status === 'requires_payment_method' ||
+          intent.status === 'requires_confirmation' ||
+          intent.status === 'requires_action' ||
+          intent.status === 'processing' ||
+          intent.status === 'succeeded')
       );
 
       if (duplicateIntent) {
         console.log('[PAYMENT] Found existing cart payment intent:', duplicateIntent.id, 'with status:', duplicateIntent.status);
-        
+
         return res.json({
           success: true,
           data: {
@@ -293,9 +293,9 @@ export class PaymentController {
         },
         description: `Cart booking (${cartData.items.length} items) - ${contactInfo.name || 'Guest'}`,
       },
-      {
-        idempotencyKey, // Stripe's built-in idempotency protection
-      });
+        {
+          idempotencyKey, // Stripe's built-in idempotency protection
+        });
 
       console.log('[PAYMENT] Cart payment intent created successfully:', paymentIntent.id);
 
@@ -324,7 +324,7 @@ export class PaymentController {
   static async confirmPayment(req: Request, res: Response) {
     try {
       const { paymentIntentId } = req.body;
-      
+
       console.log('[PAYMENT] ===== WEBHOOK-ONLY MODE =====');
       console.log('[PAYMENT] Verifying payment:', paymentIntentId);
 
@@ -351,11 +351,11 @@ export class PaymentController {
 
       // Step 2: Wait for webhook to create booking (with polling)
       console.log('[PAYMENT] ✅ Payment verified. Waiting for webhook to create booking...');
-      
+
       const Booking = require('../models/Booking').default;
       const MAX_POLL_ATTEMPTS = 30; // 30 seconds max wait
       const POLL_INTERVAL = 1000; // Poll every 1 second
-      
+
       let booking = null;
       let attempts = 0;
 
@@ -376,7 +376,7 @@ export class PaymentController {
         // Wait before next poll
         await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
         attempts++;
-        
+
         if (attempts % 5 === 0) {
           console.log(`[PAYMENT] Still waiting for webhook... (${attempts}s elapsed)`);
         }
@@ -384,10 +384,10 @@ export class PaymentController {
 
       // Step 3: Return result
       if (booking) {
-        const bookingIds = paymentIntent.metadata.bookingType === 'cart' 
-          ? await Booking.find({ 
-              'paymentInfo.stripePaymentIntentId': paymentIntentId 
-            }).distinct('_id')
+        const bookingIds = paymentIntent.metadata.bookingType === 'cart'
+          ? await Booking.find({
+            'paymentInfo.stripePaymentIntentId': paymentIntentId
+          }).distinct('_id')
           : [booking._id];
 
         res.json({
@@ -405,7 +405,7 @@ export class PaymentController {
         // Webhook hasn't processed yet - this is OK, will be processed eventually
         console.warn(`[PAYMENT] ⚠️ Webhook hasn't created booking yet after ${attempts}s`);
         console.warn(`[PAYMENT] Booking will be created by webhook shortly`);
-        
+
         res.json({
           success: true,
           message: 'Payment successful. Booking is being processed by webhook.',
@@ -448,12 +448,12 @@ export class PaymentController {
       console.log('[PAYMENT] Current payment intent status:', paymentIntent.status);
 
       // Only cancel if the payment intent is in a cancelable state
-      if (paymentIntent.status === 'requires_payment_method' || 
-          paymentIntent.status === 'requires_confirmation' ||
-          paymentIntent.status === 'requires_action') {
-        
+      if (paymentIntent.status === 'requires_payment_method' ||
+        paymentIntent.status === 'requires_confirmation' ||
+        paymentIntent.status === 'requires_action') {
+
         const canceledPaymentIntent = await stripe.paymentIntents.cancel(paymentIntentId);
-        
+
         console.log('[PAYMENT] Payment intent canceled successfully:', canceledPaymentIntent.id);
 
         res.json({
@@ -465,7 +465,7 @@ export class PaymentController {
         });
       } else {
         console.log('[PAYMENT] Payment intent cannot be canceled, current status:', paymentIntent.status);
-        
+
         res.json({
           success: true,
           message: `Payment intent is in ${paymentIntent.status} status and cannot be canceled`,
