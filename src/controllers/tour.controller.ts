@@ -368,8 +368,9 @@ export const updateTour = async (req: Request, res: Response) => {
 export const deleteTour = async (req: Request, res: Response) => {
     try {
         const { id } = req.params
-        const tour = await Tour.findByIdAndDelete(id)
-
+        
+        // First, verify the tour exists
+        const tour = await Tour.findById(id)
         if (!tour) {
             return res.status(404).json({
                 success: false,
@@ -377,7 +378,7 @@ export const deleteTour = async (req: Request, res: Response) => {
             })
         }
 
-        // Delete all bookings for this tour
+        // Delete all bookings for this tour BEFORE deleting the tour
         try {
             const deleteResult = await Booking.deleteMany({
                 packageId: tour._id,
@@ -386,17 +387,20 @@ export const deleteTour = async (req: Request, res: Response) => {
             console.log(`Deleted ${deleteResult.deletedCount} booking(s) for tour: ${tour._id}`)
         } catch (bookingError) {
             console.error("Error deleting bookings for tour:", bookingError)
-            // Don't fail the tour deletion if booking deletion fails
+            // Continue with deletion even if booking deletion fails
         }
 
-        // Delete all time slots for this tour
+        // Delete all time slots for this tour BEFORE deleting the tour
         try {
             await TimeSlotService.deleteSlotsForPackage("tour", tour._id as Types.ObjectId)
             console.log(`Time slots deleted for tour: ${tour._id}`)
         } catch (slotError) {
             console.error("Error deleting time slots for tour:", slotError)
-            // Don't fail the tour deletion if slot deletion fails
+            // Continue with deletion even if slot deletion fails
         }
+
+        // Finally, delete the tour itself
+        await Tour.findByIdAndDelete(id)
 
         res.json({
             success: true,

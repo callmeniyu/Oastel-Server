@@ -437,8 +437,9 @@ export const updateTransfer = async (req: Request, res: Response) => {
 export const deleteTransfer = async (req: Request, res: Response) => {
     try {
         const { id } = req.params
-        const transfer = await Transfer.findByIdAndDelete(id)
-
+        
+        // First, verify the transfer exists
+        const transfer = await Transfer.findById(id)
         if (!transfer) {
             return res.status(404).json({
                 success: false,
@@ -446,7 +447,7 @@ export const deleteTransfer = async (req: Request, res: Response) => {
             })
         }
 
-        // Delete all bookings for this transfer
+        // Delete all bookings for this transfer BEFORE deleting the transfer
         try {
             const deleteResult = await Booking.deleteMany({
                 packageId: transfer._id,
@@ -455,17 +456,20 @@ export const deleteTransfer = async (req: Request, res: Response) => {
             console.log(`Deleted ${deleteResult.deletedCount} booking(s) for transfer: ${transfer._id}`)
         } catch (bookingError) {
             console.error("Error deleting bookings for transfer:", bookingError)
-            // Don't fail the transfer deletion if booking deletion fails
+            // Continue with deletion even if booking deletion fails
         }
 
-        // Delete all time slots for this transfer
+        // Delete all time slots for this transfer BEFORE deleting the transfer
         try {
             await TimeSlotService.deleteSlotsForPackage("transfer", transfer._id as Types.ObjectId)
             console.log(`Time slots deleted for transfer: ${transfer._id}`)
         } catch (slotError) {
             console.error("Error deleting time slots for transfer:", slotError)
-            // Don't fail the transfer deletion if slot deletion fails
+            // Continue with deletion even if slot deletion fails
         }
+
+        // Finally, delete the transfer itself
+        await Transfer.findByIdAndDelete(id)
 
         res.json({
             success: true,
