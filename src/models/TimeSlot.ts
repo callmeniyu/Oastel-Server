@@ -36,6 +36,7 @@ const TimeSlotSchema = new Schema<TimeSlotType>(
         minimumPerson: { type: Number }, // No default, will be set from package data
         cutoffTime: { type: Date }, // For 10-hour cutoff rule
         price: { type: Number }, // Dynamic pricing per slot
+        lockedCount: { type: Number, default: 0 }, // Temporarily locked for pending payments
       },
     ],
     isAvailable: { type: Boolean, default: true },

@@ -136,4 +136,5 @@ BookingSchema.index(
   { name: 'duplicate_booking_detection' }
 );
 
-export default mongoose.models.Booking || mongoose.model<Booking>("Booking", BookingSchema);
+const BookingModel = mongoose.models.Booking || mongoose.model<Booking>("Booking", BookingSchema);
+export default BookingModel;

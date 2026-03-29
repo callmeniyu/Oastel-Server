@@ -796,6 +796,62 @@ export class TimeSlotService {
     }
 
     /**
+     * Toggle availability for slots in a date range
+     */
+    static async toggleSlotsRangeAvailability(
+        packageType: "tour" | "transfer",
+        packageId: Types.ObjectId,
+        startDate: string,
+        endDate: string,
+        times: string[],
+        isAvailable: boolean
+    ): Promise<number> {
+        try {
+            console.log(`🔄 Toggling slots range: ${packageType} ${packageId}, ${startDate} to ${endDate}, times: ${times.join(', ')}, available: ${isAvailable}`)
+            
+            // Find all time slots in the date range
+            const timeSlots = await TimeSlot.find({
+                packageType,
+                packageId,
+                date: { $gte: startDate, $lte: endDate }
+            })
+
+            let updatedCount = 0
+            for (const doc of timeSlots) {
+                let docModified = false
+                
+                // If times is empty, toggle all slots for those dates
+                if (times.length === 0) {
+                    doc.slots.forEach(slot => {
+                        if (slot.isAvailable !== isAvailable) {
+                            slot.isAvailable = isAvailable
+                            docModified = true
+                        }
+                    })
+                } else {
+                    // Toggle only specified times
+                    doc.slots.forEach(slot => {
+                        if (times.includes(slot.time) && slot.isAvailable !== isAvailable) {
+                            slot.isAvailable = isAvailable
+                            docModified = true
+                        }
+                    })
+                }
+
+                if (docModified) {
+                    await doc.save()
+                    updatedCount++
+                }
+            }
+
+            return updatedCount
+        } catch (error) {
+            console.error("Error toggling slots range availability:", error)
+            throw error
+        }
+    }
+
+    /**
      * Update slots for 90 days from tomorrow when critical fields change
      * This is called when admin changes minimumPerson, capacity, or times
      * Updates all future timeslots from tomorrow for the next 90 days

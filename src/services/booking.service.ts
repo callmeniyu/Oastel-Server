@@ -1,4 +1,4 @@
-import BookingModel, { Booking } from "../models/Booking";
+import { default as BookingModel, Booking } from "../models/Booking";
 import TimeSlotModel from "../models/TimeSlot";
 import { TimeSlotService } from "./timeSlot.service";
 import { EmailService } from "./email.service";
@@ -870,21 +870,20 @@ class BookingService {
     // Populate packageId based on packageType
     const bookings = await BookingModel.find(query)
       .sort({ createdAt: -1 })
+      .lean()
       .exec();
 
     // Manually populate packageId for each booking based on packageType
-    const populatedBookings = await Promise.all(
-      bookings.map(async (booking) => {
-        if (booking.packageType === 'tour') {
-          return BookingModel.populate(booking, { path: 'packageId', model: 'Tour' });
-        } else if (booking.packageType === 'transfer') {
-          return BookingModel.populate(booking, { path: 'packageId', model: 'Transfer' });
-        }
-        return booking;
-      })
-    );
+    // Optimized: batch populate using Mongoose to avoid the N+1 query problem
+    const tourBookings = bookings.filter(b => b.packageType === 'tour');
+    const transferBookings = bookings.filter(b => b.packageType === 'transfer');
 
-    return populatedBookings;
+    await Promise.all([
+      tourBookings.length > 0 ? BookingModel.populate(tourBookings, { path: 'packageId', model: 'Tour' }) : Promise.resolve(),
+      transferBookings.length > 0 ? BookingModel.populate(transferBookings, { path: 'packageId', model: 'Transfer' }) : Promise.resolve()
+    ]);
+
+    return bookings as unknown as Booking[];
   }
 
   // Get bookings with full package details
@@ -901,45 +900,55 @@ class BookingService {
     // Get bookings first
     const bookings = await BookingModel.find(query)
       .sort({ createdAt: -1 })
+      .lean()
       .exec();
 
     // Manually populate packageId for each booking and format for frontend
-    const bookingsWithDetails = await Promise.all(
-      bookings.map(async (booking) => {
-        let packageDetails = null;
-        
-        if (booking.packageType === 'tour') {
-          const TourModel = mongoose.model('Tour');
-          packageDetails = await TourModel.findById(booking.packageId).select('title image price duration slug');
-        } else if (booking.packageType === 'transfer') {
-          const TransferModel = mongoose.model('Transfer');
-          packageDetails = await TransferModel.findById(booking.packageId).select('title image price duration vehicle slug');
-        }
+    // Optimized: batch fetch models to avoid N+1 queries
+    const tourIds = [...new Set(bookings.filter(b => b.packageType === 'tour').map(b => b.packageId.toString()))];
+    const transferIds = [...new Set(bookings.filter(b => b.packageType === 'transfer').map(b => b.packageId.toString()))];
 
-        return {
-          _id: booking._id,
-          packageType: booking.packageType,
-          packageId: booking.packageId,
-          date: booking.date,
-          time: booking.time,
-          adults: booking.adults,
-          children: booking.children,
-          pickupLocation: booking.pickupLocation,
-          total: booking.total,
-          status: booking.status,
-          createdAt: booking.createdAt,
-          contactInfo: booking.contactInfo,
-          packageDetails: packageDetails ? {
-            title: packageDetails.title,
-            image: packageDetails.image,
-            price: packageDetails.price,
-            duration: packageDetails.duration,
-            slug: packageDetails.slug,
-            vehicle: packageDetails.vehicle // for transfers
-          } : null
-        };
-      })
-    );
+    const [tours, transfers] = await Promise.all([
+      tourIds.length > 0 ? mongoose.model('Tour').find({ _id: { $in: tourIds } }).select('title image price duration slug').lean() : Promise.resolve([]),
+      transferIds.length > 0 ? mongoose.model('Transfer').find({ _id: { $in: transferIds } }).select('title image price duration vehicle slug').lean() : Promise.resolve([])
+    ]);
+
+    const tourMap = new Map((tours as any[]).map(t => [t._id.toString(), t]));
+    const transferMap = new Map((transfers as any[]).map(t => [t._id.toString(), t]));
+
+    const bookingsWithDetails = bookings.map((booking) => {
+      let packageDetails = null;
+      const pid = booking.packageId.toString();
+
+      if (booking.packageType === 'tour') {
+        packageDetails = tourMap.get(pid);
+      } else if (booking.packageType === 'transfer') {
+        packageDetails = transferMap.get(pid);
+      }
+
+      return {
+        _id: booking._id,
+        packageType: booking.packageType,
+        packageId: booking.packageId,
+        date: booking.date,
+        time: booking.time,
+        adults: booking.adults,
+        children: booking.children,
+        pickupLocation: booking.pickupLocation,
+        total: booking.total,
+        status: booking.status,
+        createdAt: booking.createdAt,
+        contactInfo: booking.contactInfo,
+        packageDetails: packageDetails ? {
+          title: packageDetails.title,
+          image: packageDetails.image,
+          price: packageDetails.price,
+          duration: packageDetails.duration,
+          slug: packageDetails.slug,
+          vehicle: packageDetails.vehicle // for transfers
+        } : null
+      };
+    });
 
     return bookingsWithDetails;
   }
